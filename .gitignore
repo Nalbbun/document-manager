@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local runtime data
+data/storage/*
+!data/storage/default/
+!data/storage/default/.gitkeep
+data/storage/default/*
+!data/storage/default/.gitkeep
+!data/storage/unclassified/
+!data/storage/unclassified/.gitkeep
+data/storage/unclassified/*
+!data/storage/unclassified/.gitkeep
+data/index/*
+!data/index/.gitkeep
+data/config/*
+!data/config/.gitkeep
+data/logs/*
+!data/logs/.gitkeep
+data/temp/
+data/trash/
+logs/
+
+# Env
+.env
+backend/.env
+backend/.env.txt
+frontend/.env
+frontend/.env.txt
+
+# OS
+.DS_Store
+Thumbs.db
