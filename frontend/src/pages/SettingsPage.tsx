@@ -79,6 +79,14 @@ export default function SettingsPage() {
           <input value={config.logRootPath} onChange={(event) => setConfig({ ...config, logRootPath: event.target.value })} />
         </label>
         <label>
+          휴지통 루트
+          <input value={config.trashRootPath} onChange={(event) => setConfig({ ...config, trashRootPath: event.target.value })} />
+        </label>
+        <label>
+          백업 루트
+          <input value={config.backupRootPath} onChange={(event) => setConfig({ ...config, backupRootPath: event.target.value })} />
+        </label>
+        <label>
           허용 확장자
           <input value={extensions} onChange={(event) => setExtensions(event.target.value)} />
         </label>
@@ -128,4 +136,3 @@ export default function SettingsPage() {
     </section>
   );
 }
-

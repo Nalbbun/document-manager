@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse
 
+from app.models.schemas import BulkDocumentMoveRequest, BulkDocumentRequest, DocumentMoveRequest, DocumentRenameRequest
 from app.services import document_service
 
 
@@ -28,6 +29,30 @@ def get_documents(
     }
 
 
+@router.post("/bulk/move")
+def bulk_move_documents(payload: BulkDocumentMoveRequest) -> dict:
+    result = document_service.bulk_move_documents(payload.documentIds, payload.folderId)
+    return {"success": result["failCount"] == 0, "message": "일괄 이동 처리 완료", **result}
+
+
+@router.post("/bulk/delete")
+def bulk_delete_documents(payload: BulkDocumentRequest) -> dict:
+    result = document_service.bulk_delete_documents(payload.documentIds)
+    return {"success": result["failCount"] == 0, "message": "선택 문서가 휴지통으로 이동되었습니다.", **result}
+
+
+@router.patch("/{document_id}/move")
+def move_document(document_id: str, payload: DocumentMoveRequest) -> dict:
+    document = document_service.move_document(document_id, payload.folderId)
+    return {"success": True, "message": "문서가 이동되었습니다.", "document": document}
+
+
+@router.patch("/{document_id}/rename")
+def rename_document(document_id: str, payload: DocumentRenameRequest) -> dict:
+    document = document_service.rename_document(document_id, payload.fileName)
+    return {"success": True, "message": "문서명이 변경되었습니다.", "document": document}
+
+
 @router.get("/{document_id}/file")
 def get_document_file(document_id: str) -> FileResponse:
     return document_service.get_file_response(document_id)
@@ -45,6 +70,5 @@ def get_document(document_id: str) -> dict:
 
 @router.delete("/{document_id}")
 def delete_document(document_id: str) -> dict:
-    document_service.delete_document(document_id)
-    return {"success": True, "message": "문서가 삭제되었습니다."}
-
+    trash_item = document_service.delete_document(document_id)
+    return {"success": True, "message": "문서가 휴지통으로 이동되었습니다.", "trashItem": trash_item}

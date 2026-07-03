@@ -6,6 +6,7 @@ import {
   ListChecks,
   Search,
   Settings,
+  Trash2,
   UploadCloud
 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -18,6 +19,7 @@ const items = [
   { to: '/documents', label: '문서/폴더', icon: Files },
   { to: '/search', label: '검색', icon: Search },
   { to: '/index', label: '인덱스', icon: ListChecks },
+  { to: '/trash', label: '휴지통', icon: Trash2 },
   { to: '/settings', label: '설정', icon: Settings },
   { to: '/logs', label: '로그', icon: History }
 ];
@@ -30,7 +32,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <aside className="sidebar">
         <div className="brand">
           <FileSearch size={24} />
-          <span>문서관리 v1.0</span>
+          <span>문서관리 v1.1</span>
         </div>
         <nav>
           {items.map(({ to, label, icon: Icon }) => (

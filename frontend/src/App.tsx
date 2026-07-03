@@ -6,6 +6,7 @@ import IndexPage from './pages/IndexPage';
 import LogsPage from './pages/LogsPage';
 import SearchPage from './pages/SearchPage';
 import SettingsPage from './pages/SettingsPage';
+import TrashPage from './pages/TrashPage';
 import UploadPage from './pages/UploadPage';
 import ViewerPage from './pages/ViewerPage';
 
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/search" element={<SearchPage />} />
         <Route path="/viewer/:documentId" element={<ViewerPage />} />
         <Route path="/index" element={<IndexPage />} />
+        <Route path="/trash" element={<TrashPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/logs" element={<LogsPage />} />
       </Routes>

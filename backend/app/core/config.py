@@ -15,6 +15,8 @@ class Settings:
         "storageRootPath": "data/storage",
         "indexRootPath": "data/index",
         "logRootPath": "data/logs",
+        "trashRootPath": "data/trash",
+        "backupRootPath": "data/backup",
         "allowedExtensions": ["pdf", "md", "txt"],
         "maxUploadSizeMB": 100,
         "defaultFolderName": "default",
@@ -79,6 +81,14 @@ class Settings:
         return self.resolve_project_path(self.runtime_config["logRootPath"])
 
     @property
+    def trash_root(self) -> Path:
+        return self.resolve_project_path(self.runtime_config["trashRootPath"])
+
+    @property
+    def backup_root(self) -> Path:
+        return self.resolve_project_path(self.runtime_config["backupRootPath"])
+
+    @property
     def max_upload_size_bytes(self) -> int:
         return int(self.runtime_config["maxUploadSizeMB"]) * 1024 * 1024
 
@@ -102,4 +112,3 @@ class Settings:
 
 
 settings = Settings()
-

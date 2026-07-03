@@ -20,11 +20,29 @@ export type DocumentItem = {
   filePath: string;
   pageCount: number | null;
   lineCount: number | null;
+  fileHash: string;
+  tags: string[];
+  favorite: boolean;
+  pinned: boolean;
+  memo: string;
   searchable: boolean;
   indexStatus: 'READY' | 'INDEXING' | 'INDEXED' | 'FAILED' | 'UNSEARCHABLE' | string;
   indexError?: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type TrashItem = {
+  trashId: string;
+  documentId: string;
+  fileName: string;
+  originalFolderId: string;
+  originalFolderName: string;
+  originalPath: string;
+  trashPath: string;
+  deletedAt: string;
+  deletedReason: string;
+  document: DocumentItem;
 };
 
 export type SearchResult = {
@@ -55,6 +73,8 @@ export type AppConfig = {
   storageRootPath: string;
   indexRootPath: string;
   logRootPath: string;
+  trashRootPath: string;
+  backupRootPath: string;
   allowedExtensions: string[];
   maxUploadSizeMB: number;
   defaultFolderName: string;
@@ -81,4 +101,3 @@ export type PreviewResponse = {
   fileUrl: string;
   lines: Array<{ lineNumber: number; text: string }>;
 };
-

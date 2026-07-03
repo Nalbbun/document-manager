@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import hashlib
 from pathlib import Path
 from typing import Any
 
@@ -152,12 +153,17 @@ def _register_file_content(
         "extension": extension,
         "mimeType": guess_mime_type(file_name),
         "fileSize": len(content),
+        "fileHash": hashlib.sha256(content).hexdigest(),
         "filePath": relative_to_project(target_path, settings.project_root),
         "pageCount": extraction["pageCount"],
         "lineCount": extraction["lineCount"],
         "searchable": extraction["searchable"],
         "indexStatus": extraction["indexStatus"],
         "indexError": extraction["error"],
+        "tags": [],
+        "favorite": False,
+        "pinned": False,
+        "memo": "",
         "createdAt": timestamp,
         "updatedAt": timestamp,
     }
@@ -184,4 +190,3 @@ def _refresh_folder_counts() -> None:
         folder["updatedAt"] = now_iso()
     write_folders(folders)
     list_folders()
-

@@ -255,6 +255,10 @@ input[type="checkbox"] {
   color: var(--danger);
 }
 
+.icon-text-button.danger {
+  color: var(--danger);
+}
+
 button:disabled,
 .icon-button[aria-disabled="true"] {
   cursor: not-allowed;
@@ -555,6 +559,54 @@ label {
   grid-template-columns: minmax(180px, 240px) 130px minmax(220px, 1fr) auto;
 }
 
+.bulk-action-bar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px) auto auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.bulk-action-bar strong,
+.bulk-action-bar span {
+  display: block;
+}
+
+.bulk-action-bar span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.checkbox-cell {
+  width: 42px;
+  text-align: center;
+}
+
+.checkbox-cell input {
+  margin: 0 auto;
+}
+
+.inline-edit {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 34px 34px;
+  gap: 6px;
+  align-items: center;
+}
+
+.document-name-text {
+  display: inline-block;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.trash-toolbar {
+  max-width: 420px;
+}
+
 .result-summary {
   display: flex;
   gap: 10px;
@@ -842,6 +894,7 @@ mark {
 
   .split-layout,
   .management-layout,
+  .bulk-action-bar,
   .settings-form {
     grid-template-columns: 1fr;
   }

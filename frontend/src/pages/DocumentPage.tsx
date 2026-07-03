@@ -1,19 +1,25 @@
-import { Check, Eye, FolderOpen, Pencil, Plus, RefreshCcw, Trash2, X } from 'lucide-react';
-import { FormEvent, useEffect, useState } from 'react';
+import { Check, Eye, FolderOpen, MoveRight, Pencil, Plus, RefreshCcw, RotateCcw, Trash2, X } from 'lucide-react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { DocumentViewerModal, type ViewerTarget } from '../components/DocumentViewerModal';
 import { StatusPill } from '../components/StatusPill';
+import { useOperation } from '../contexts/OperationContext';
 import type { DocumentItem, Folder } from '../types/models';
 
 export default function DocumentPage() {
+  const { startOperation, endOperation } = useOperation();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [folderId, setFolderId] = useState('');
   const [extension, setExtension] = useState('');
   const [keyword, setKeyword] = useState('');
   const [folderName, setFolderName] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingName, setEditingName] = useState('');
+  const [folderEditingId, setFolderEditingId] = useState<string | null>(null);
+  const [folderEditingName, setFolderEditingName] = useState('');
+  const [documentEditingId, setDocumentEditingId] = useState<string | null>(null);
+  const [documentEditingName, setDocumentEditingName] = useState('');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [moveTargetId, setMoveTargetId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
@@ -21,6 +27,7 @@ export default function DocumentPage() {
   const loadFolders = async () => {
     const response = await api.folders();
     setFolders(response.folders);
+    setMoveTargetId((current) => current || response.folders[0]?.folderId || '');
     return response.folders;
   };
 
@@ -31,6 +38,7 @@ export default function DocumentPage() {
       keyword
     });
     setDocuments(response.documents);
+    setSelectedIds((current) => current.filter((id) => response.documents.some((document) => document.documentId === id)));
   };
 
   const load = async () => {
@@ -41,7 +49,9 @@ export default function DocumentPage() {
         api.documents({ folderId, extension, keyword })
       ]);
       setFolders(folderResponse.folders);
+      setMoveTargetId((current) => current || folderResponse.folders[0]?.folderId || '');
       setDocuments(documentResponse.documents);
+      setSelectedIds((current) => current.filter((id) => documentResponse.documents.some((document) => document.documentId === id)));
     } catch (err) {
       setError(err instanceof Error ? err.message : '문서/폴더 정보를 불러오지 못했습니다.');
     }
@@ -50,6 +60,13 @@ export default function DocumentPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  const selectedDocuments = useMemo(
+    () => documents.filter((document) => selectedIds.includes(document.documentId)),
+    [documents, selectedIds]
+  );
+
+  const allVisibleSelected = documents.length > 0 && selectedIds.length === documents.length;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -60,10 +77,21 @@ export default function DocumentPage() {
     try {
       setError('');
       setFolderId(nextFolderId);
+      setSelectedIds([]);
       await loadDocuments(nextFolderId);
     } catch (err) {
       setError(err instanceof Error ? err.message : '폴더 문서 조회 실패');
     }
+  };
+
+  const toggleDocument = (documentId: string) => {
+    setSelectedIds((current) =>
+      current.includes(documentId) ? current.filter((id) => id !== documentId) : [...current, documentId]
+    );
+  };
+
+  const toggleAllVisible = () => {
+    setSelectedIds(allVisibleSelected ? [] : documents.map((document) => document.documentId));
   };
 
   const createFolder = async (event: FormEvent) => {
@@ -82,12 +110,12 @@ export default function DocumentPage() {
   };
 
   const renameFolder = async (targetFolderId: string) => {
-    if (!editingName.trim()) return;
+    if (!folderEditingName.trim()) return;
     try {
       setError('');
       setMessage('');
-      await api.updateFolder(targetFolderId, editingName.trim());
-      setEditingId(null);
+      await api.updateFolder(targetFolderId, folderEditingName.trim());
+      setFolderEditingId(null);
       setMessage('폴더명이 변경되었습니다.');
       await loadFolders();
       await loadDocuments();
@@ -112,13 +140,92 @@ export default function DocumentPage() {
     }
   };
 
+  const renameDocument = async (document: DocumentItem) => {
+    if (!documentEditingName.trim()) return;
+    try {
+      setError('');
+      setMessage('');
+      await api.renameDocument(document.documentId, documentEditingName.trim());
+      setDocumentEditingId(null);
+      setMessage('문서명이 변경되었습니다.');
+      await loadDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '문서명 변경 실패');
+    }
+  };
+
+  const moveSelectedDocuments = async () => {
+    if (!selectedIds.length || !moveTargetId) return;
+    if (!window.confirm(`선택한 문서 ${selectedIds.length}건을 이동할까요?`)) return;
+    try {
+      setError('');
+      setMessage('');
+      startOperation('선택 문서 이동 중');
+      const result = await api.bulkMoveDocuments(selectedIds, moveTargetId);
+      setMessage(`이동 완료: 성공 ${result.successCount}, 실패 ${result.failCount}`);
+      setSelectedIds([]);
+      await loadFolders();
+      await loadDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '일괄 이동 실패');
+    } finally {
+      endOperation();
+    }
+  };
+
+  const deleteSelectedDocuments = async () => {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`선택한 문서 ${selectedIds.length}건을 휴지통으로 이동할까요?`)) return;
+    try {
+      setError('');
+      setMessage('');
+      startOperation('선택 문서 휴지통 이동 중');
+      const result = await api.bulkDeleteDocuments(selectedIds);
+      setMessage(`휴지통 이동 완료: 성공 ${result.successCount}, 실패 ${result.failCount}`);
+      setSelectedIds([]);
+      await loadFolders();
+      await loadDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '일괄 삭제 실패');
+    } finally {
+      endOperation();
+    }
+  };
+
+  const rebuildSelectedDocuments = async () => {
+    if (!selectedIds.length) return;
+    if (!window.confirm(`선택한 문서 ${selectedIds.length}건의 인덱스를 재생성할까요?`)) return;
+    try {
+      setError('');
+      setMessage('');
+      startOperation('선택 문서 인덱스 재생성 중');
+      let successCount = 0;
+      let failCount = 0;
+      for (const documentId of selectedIds) {
+        try {
+          await api.rebuildDocumentIndex(documentId);
+          successCount += 1;
+        } catch {
+          failCount += 1;
+        }
+      }
+      setMessage(`인덱스 재생성 완료: 성공 ${successCount}, 실패 ${failCount}`);
+      setSelectedIds([]);
+      await loadDocuments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '일괄 인덱스 재생성 실패');
+    } finally {
+      endOperation();
+    }
+  };
+
   const removeDocument = async (document: DocumentItem) => {
-    if (!window.confirm(`${document.displayName} 문서를 삭제할까요?`)) return;
+    if (!window.confirm(`${document.displayName} 문서를 휴지통으로 이동할까요?`)) return;
     try {
       setError('');
       setMessage('');
       await api.deleteDocument(document.documentId);
-      setMessage('문서가 삭제되었습니다.');
+      setMessage('문서가 휴지통으로 이동되었습니다.');
       await loadFolders();
       await loadDocuments();
     } catch (err) {
@@ -134,7 +241,7 @@ export default function DocumentPage() {
       <div className="page-header">
         <div>
           <h1>문서/폴더 관리</h1>
-          <p>폴더 생성, 이름 변경, 삭제와 등록 문서 조회를 한 화면에서 처리합니다.</p>
+          <p>폴더 정리, 문서명 변경, 문서 이동, 일괄 작업을 한 화면에서 처리합니다.</p>
         </div>
         <button className="icon-text-button" onClick={() => void load()} title="새로고침">
           <RefreshCcw size={17} />
@@ -190,15 +297,15 @@ export default function DocumentPage() {
               >
                 <FolderOpen size={18} />
                 <div className="folder-select-main">
-                  {editingId === folder.folderId ? (
+                  {folderEditingId === folder.folderId ? (
                     <input
-                      value={editingName}
+                      value={folderEditingName}
                       onClick={(event) => event.stopPropagation()}
                       onKeyDown={(event) => {
                         event.stopPropagation();
                         if (event.key === 'Enter') void renameFolder(folder.folderId);
                       }}
-                      onChange={(event) => setEditingName(event.target.value)}
+                      onChange={(event) => setFolderEditingName(event.target.value)}
                     />
                   ) : (
                     <>
@@ -209,12 +316,12 @@ export default function DocumentPage() {
                 </div>
                 <b>{folder.documentCount.toLocaleString()}</b>
                 <div className="row-actions" onClick={(event) => event.stopPropagation()}>
-                  {editingId === folder.folderId ? (
+                  {folderEditingId === folder.folderId ? (
                     <>
                       <button className="icon-button success" onClick={() => void renameFolder(folder.folderId)} title="저장">
                         <Check size={16} />
                       </button>
-                      <button className="icon-button" onClick={() => setEditingId(null)} title="취소">
+                      <button className="icon-button" onClick={() => setFolderEditingId(null)} title="취소">
                         <X size={16} />
                       </button>
                     </>
@@ -224,8 +331,8 @@ export default function DocumentPage() {
                         className="icon-button"
                         disabled={folder.isSystemFolder}
                         onClick={() => {
-                          setEditingId(folder.folderId);
-                          setEditingName(folder.folderName);
+                          setFolderEditingId(folder.folderId);
+                          setFolderEditingName(folder.folderName);
                         }}
                         title="이름 변경"
                       >
@@ -267,6 +374,32 @@ export default function DocumentPage() {
             <button className="icon-text-button primary">조회</button>
           </form>
 
+          <section className="panel bulk-action-bar">
+            <div>
+              <strong>{selectedDocuments.length.toLocaleString()}개 선택</strong>
+              <span>현재 목록에서 선택한 문서를 이동, 휴지통 이동, 재색인할 수 있습니다.</span>
+            </div>
+            <select value={moveTargetId} onChange={(event) => setMoveTargetId(event.target.value)}>
+              {folders.map((folder) => (
+                <option key={folder.folderId} value={folder.folderId}>
+                  {folder.folderName}
+                </option>
+              ))}
+            </select>
+            <button className="icon-text-button" disabled={!selectedIds.length || !moveTargetId} onClick={moveSelectedDocuments}>
+              <MoveRight size={17} />
+              선택 이동
+            </button>
+            <button className="icon-text-button" disabled={!selectedIds.length} onClick={rebuildSelectedDocuments}>
+              <RotateCcw size={17} />
+              선택 재색인
+            </button>
+            <button className="icon-text-button danger" disabled={!selectedIds.length} onClick={deleteSelectedDocuments}>
+              <Trash2 size={17} />
+              선택 휴지통
+            </button>
+          </section>
+
           <section className="panel">
             <div className="section-header">
               <h2>{selectedFolder ? `${selectedFolder.folderName} 문서` : '전체 문서'}</h2>
@@ -276,6 +409,9 @@ export default function DocumentPage() {
               <table>
                 <thead>
                   <tr>
+                    <th className="checkbox-cell">
+                      <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
+                    </th>
                     <th>문서명</th>
                     <th>폴더</th>
                     <th>유형</th>
@@ -288,7 +424,28 @@ export default function DocumentPage() {
                 <tbody>
                   {documents.map((document) => (
                     <tr key={document.documentId}>
-                      <td>{document.displayName}</td>
+                      <td className="checkbox-cell">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(document.documentId)}
+                          onChange={() => toggleDocument(document.documentId)}
+                        />
+                      </td>
+                      <td>
+                        {documentEditingId === document.documentId ? (
+                          <div className="inline-edit">
+                            <input value={documentEditingName} onChange={(event) => setDocumentEditingName(event.target.value)} />
+                            <button className="icon-button success" onClick={() => void renameDocument(document)} title="저장">
+                              <Check size={16} />
+                            </button>
+                            <button className="icon-button" onClick={() => setDocumentEditingId(null)} title="취소">
+                              <X size={16} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="document-name-text">{document.displayName}</span>
+                        )}
+                      </td>
                       <td>{document.folderName}</td>
                       <td className="uppercase">{document.extension}</td>
                       <td>{formatBytes(document.fileSize)}</td>
@@ -301,7 +458,17 @@ export default function DocumentPage() {
                           <button className="icon-button" onClick={() => setViewerTarget({ documentId: document.documentId })} title="열기">
                             <Eye size={16} />
                           </button>
-                          <button className="icon-button danger" onClick={() => void removeDocument(document)} title="삭제">
+                          <button
+                            className="icon-button"
+                            onClick={() => {
+                              setDocumentEditingId(document.documentId);
+                              setDocumentEditingName(document.displayName);
+                            }}
+                            title="문서명 변경"
+                          >
+                            <Pencil size={16} />
+                          </button>
+                          <button className="icon-button danger" onClick={() => void removeDocument(document)} title="휴지통 이동">
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -310,7 +477,7 @@ export default function DocumentPage() {
                   ))}
                   {documents.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="empty">
+                      <td colSpan={8} className="empty">
                         조회된 문서가 없습니다.
                       </td>
                     </tr>

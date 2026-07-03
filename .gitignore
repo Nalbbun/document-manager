@@ -27,7 +27,13 @@ data/config/*
 data/logs/*
 !data/logs/.gitkeep
 data/temp/
-data/trash/
+data/trash/*
+!data/trash/.gitkeep
+!data/trash/documents/
+data/trash/documents/*
+!data/trash/documents/.gitkeep
+data/backup/*
+!data/backup/.gitkeep
 logs/
 
 # Env

@@ -5,6 +5,7 @@ import type {
   IndexStatus,
   PreviewResponse,
   SearchResult,
+  TrashItem,
   UploadResult
 } from '../types/models';
 
@@ -60,6 +61,34 @@ export const api = {
   document: (documentId: string) => request<{ document: DocumentItem }>(`/api/documents/${documentId}`),
   preview: (documentId: string) => request<PreviewResponse>(`/api/documents/${documentId}/preview`),
   deleteDocument: (documentId: string) => request(`/api/documents/${documentId}`, { method: 'DELETE' }),
+  moveDocument: (documentId: string, folderId: string) =>
+    request<{ success: boolean; message: string; document: DocumentItem }>(`/api/documents/${documentId}/move`, {
+      method: 'PATCH',
+      body: { folderId }
+    }),
+  renameDocument: (documentId: string, fileName: string) =>
+    request<{ success: boolean; message: string; document: DocumentItem }>(`/api/documents/${documentId}/rename`, {
+      method: 'PATCH',
+      body: { fileName }
+    }),
+  bulkMoveDocuments: (documentIds: string[], folderId: string) =>
+    request<{
+      success: boolean;
+      message: string;
+      successCount: number;
+      failCount: number;
+      succeeded: DocumentItem[];
+      failed: Array<{ documentId: string; reason: string }>;
+    }>('/api/documents/bulk/move', { method: 'POST', body: { documentIds, folderId } }),
+  bulkDeleteDocuments: (documentIds: string[]) =>
+    request<{
+      success: boolean;
+      message: string;
+      successCount: number;
+      failCount: number;
+      succeeded: TrashItem[];
+      failed: Array<{ documentId: string; reason: string }>;
+    }>('/api/documents/bulk/delete', { method: 'POST', body: { documentIds } }),
   upload: (folderId: string, files: FileList, onProgress?: (percent: number) => void) => {
     const form = new FormData();
     form.set('folderId', folderId);
@@ -94,7 +123,24 @@ export const api = {
   updateConfig: (payload: Partial<AppConfig>) =>
     request<{ success: boolean; message: string; config: AppConfig }>('/api/config', { method: 'PUT', body: payload }),
   log: (type: 'app' | 'error' | 'audit', lines = 200) =>
-    request<{ type: string; lines: string[] }>(`/api/logs/${type}${query({ lines })}`)
+    request<{ type: string; lines: string[] }>(`/api/logs/${type}${query({ lines })}`),
+  trash: () => request<{ items: TrashItem[] }>('/api/trash'),
+  restoreTrashItem: (trashId: string, folderId?: string) =>
+    request<{ success: boolean; message: string; document: DocumentItem }>(`/api/trash/${trashId}/restore`, {
+      method: 'POST',
+      body: { folderId }
+    }),
+  deleteTrashItem: (trashId: string) =>
+    request<{ success: boolean; message: string; item: TrashItem }>(`/api/trash/${trashId}`, { method: 'DELETE' }),
+  emptyTrash: () =>
+    request<{
+      success: boolean;
+      message: string;
+      successCount: number;
+      failCount: number;
+      succeeded: TrashItem[];
+      failed: Array<{ trashId: string; reason: string }>;
+    }>('/api/trash', { method: 'DELETE' })
 };
 
 function uploadWithProgress<T>(path: string, form: FormData, onProgress?: (percent: number) => void): Promise<T> {

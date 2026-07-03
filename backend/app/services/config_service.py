@@ -9,6 +9,8 @@ ALLOWED_CONFIG_KEYS = {
     "storageRootPath",
     "indexRootPath",
     "logRootPath",
+    "trashRootPath",
+    "backupRootPath",
     "allowedExtensions",
     "maxUploadSizeMB",
     "defaultFolderName",
@@ -38,4 +40,3 @@ def update_config(payload: dict) -> dict:
     config.update(updates)
     settings.write_runtime_config(config)
     return config
-

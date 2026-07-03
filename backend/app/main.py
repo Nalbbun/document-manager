@@ -15,6 +15,7 @@ from app.routers import (
     index_router,
     log_router,
     search_router,
+    trash_router,
     upload_router,
 )
 from app.services.bootstrap_service import initialize_runtime
@@ -28,7 +29,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Document Manager v1 API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Document Manager v1 API", version="1.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,6 +60,6 @@ app.include_router(upload_router.router)
 app.include_router(document_router.router)
 app.include_router(search_router.router)
 app.include_router(index_router.router)
+app.include_router(trash_router.router)
 app.include_router(config_router.router)
 app.include_router(log_router.router)
-
