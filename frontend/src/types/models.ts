@@ -45,6 +45,53 @@ export type TrashItem = {
   document: DocumentItem;
 };
 
+export type BackupItem = {
+  backupId: string;
+  fileName: string;
+  fileSize: number;
+  backupPath: string;
+  createdAt: string;
+  status: string;
+  reason: string;
+};
+
+export type BackupValidation = {
+  valid: boolean;
+  entryCount: number;
+  missing: string[];
+  badFile: string | null;
+};
+
+export type IntegrityIssue = {
+  type: string;
+  severity: string;
+  message: string;
+  repair: 'repairable' | 'manual' | string;
+  targetId: string | null;
+  targetName: string | null;
+  details: Record<string, unknown>;
+};
+
+export type IntegrityReport = {
+  checkedAt: string;
+  summary: {
+    totalIssues: number;
+    repairable: number;
+    manual: number;
+    byType: Record<string, number>;
+  };
+  issues: IntegrityIssue[];
+};
+
+export type RepairReport = {
+  success: boolean;
+  message: string;
+  before: IntegrityReport;
+  after: IntegrityReport;
+  actions: Array<{ type: string; targetId: string | null; targetName: string; completedAt: string }>;
+  safetyBackup: BackupItem;
+};
+
 export type SearchResult = {
   documentId: string;
   folderId: string;

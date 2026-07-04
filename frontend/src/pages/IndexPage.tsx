@@ -1,9 +1,9 @@
-import { FileText, RefreshCcw, RotateCcw } from 'lucide-react';
+import { FileText, RefreshCcw, RotateCcw, ShieldCheck, Wrench } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { StatusPill } from '../components/StatusPill';
 import { useOperation } from '../contexts/OperationContext';
-import type { DocumentItem, IndexStatus } from '../types/models';
+import type { DocumentItem, IndexStatus, IntegrityReport } from '../types/models';
 
 export default function IndexPage() {
   const { startOperation, endOperation } = useOperation();
@@ -14,6 +14,7 @@ export default function IndexPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [taskLabel, setTaskLabel] = useState('');
+  const [integrity, setIntegrity] = useState<IntegrityReport | null>(null);
 
   const load = async () => {
     try {
@@ -75,6 +76,44 @@ export default function IndexPage() {
     }
   };
 
+  const checkIntegrity = async () => {
+    try {
+      setBusy(true);
+      setTaskLabel('데이터 정합성을 점검하는 중');
+      setError('');
+      setMessage('');
+      const response = await api.integrity();
+      setIntegrity(response);
+      setMessage(`점검 완료: 오류 ${response.summary.totalIssues}건, 자동 복구 가능 ${response.summary.repairable}건`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '데이터 정합성 점검 실패');
+    } finally {
+      setBusy(false);
+      setTaskLabel('');
+    }
+  };
+
+  const repairIntegrity = async () => {
+    if (!window.confirm('자동 복구를 실행할까요? 복구 전 현재 데이터가 자동 백업됩니다.')) return;
+    try {
+      setBusy(true);
+      setTaskLabel('데이터 정합성을 자동 복구하는 중');
+      startOperation('데이터 정합성 자동 복구 중');
+      setError('');
+      setMessage('');
+      const response = await api.repairIntegrity();
+      setIntegrity(response.after);
+      setMessage(`복구 완료: 조치 ${response.actions.length}건, 남은 오류 ${response.after.summary.totalIssues}건`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '데이터 정합성 자동 복구 실패');
+    } finally {
+      setBusy(false);
+      setTaskLabel('');
+      endOperation();
+    }
+  };
+
   return (
     <section className="page">
       <div className="page-header">
@@ -125,6 +164,66 @@ export default function IndexPage() {
             선택 문서 재생성
           </button>
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="section-header">
+          <h2>데이터 정합성 점검</h2>
+          <span>{integrity ? `${integrity.summary.totalIssues.toLocaleString()}건 발견` : '미점검'}</span>
+        </div>
+        <div className="maintenance-actions">
+          <button className="icon-text-button" disabled={busy} onClick={checkIntegrity} title="정합성 점검">
+            <ShieldCheck size={17} />
+            점검 실행
+          </button>
+          <button
+            className="icon-text-button primary"
+            disabled={busy || !integrity?.summary.repairable}
+            onClick={repairIntegrity}
+            title="자동 복구"
+          >
+            <Wrench size={17} />
+            자동 복구
+          </button>
+        </div>
+        {integrity && (
+          <>
+            <div className="result-summary">
+              <span>전체 {integrity.summary.totalIssues}</span>
+              <span>자동 복구 가능 {integrity.summary.repairable}</span>
+              <span>수동 조치 {integrity.summary.manual}</span>
+            </div>
+            <div className="table-wrap compact-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>유형</th>
+                    <th>대상</th>
+                    <th>메시지</th>
+                    <th>조치</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {integrity.issues.slice(0, 12).map((issue, index) => (
+                    <tr key={`${issue.type}-${issue.targetId}-${index}`}>
+                      <td>{issue.type}</td>
+                      <td>{issue.targetName || issue.targetId || '-'}</td>
+                      <td>{issue.message}</td>
+                      <td>{issue.repair === 'repairable' ? '자동 복구' : '수동 확인'}</td>
+                    </tr>
+                  ))}
+                  {integrity.issues.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="empty">
+                        정합성 오류가 없습니다.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
 
       <section className="panel">

@@ -1,9 +1,13 @@
 import type {
   AppConfig,
+  BackupItem,
+  BackupValidation,
   DocumentItem,
   Folder,
+  IntegrityReport,
   IndexStatus,
   PreviewResponse,
+  RepairReport,
   SearchResult,
   TrashItem,
   UploadResult
@@ -140,7 +144,25 @@ export const api = {
       failCount: number;
       succeeded: TrashItem[];
       failed: Array<{ trashId: string; reason: string }>;
-    }>('/api/trash', { method: 'DELETE' })
+    }>('/api/trash', { method: 'DELETE' }),
+  backups: () => request<{ items: BackupItem[] }>('/api/backups'),
+  createBackup: () =>
+    request<{ success: boolean; message: string; backup: BackupItem }>('/api/backups', { method: 'POST' }),
+  validateBackup: (backupId: string) =>
+    request<{ success: boolean; message: string; validation: BackupValidation }>(`/api/backups/${backupId}/validate`, {
+      method: 'POST'
+    }),
+  restoreBackup: (backupId: string) =>
+    request<{
+      success: boolean;
+      message: string;
+      backup: BackupItem;
+      safetyBackup: BackupItem;
+      validation: BackupValidation;
+    }>(`/api/backups/${backupId}/restore`, { method: 'POST' }),
+  backupDownloadUrl: (backupId: string) => `${API_BASE_URL}/api/backups/${backupId}/download`,
+  integrity: () => request<IntegrityReport>('/api/maintenance/integrity'),
+  repairIntegrity: () => request<RepairReport>('/api/maintenance/repair', { method: 'POST' })
 };
 
 function uploadWithProgress<T>(path: string, form: FormData, onProgress?: (percent: number) => void): Promise<T> {

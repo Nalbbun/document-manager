@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
+import BackupPage from './pages/BackupPage';
 import DashboardPage from './pages/DashboardPage';
 import DocumentPage from './pages/DocumentPage';
 import IndexPage from './pages/IndexPage';
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/viewer/:documentId" element={<ViewerPage />} />
         <Route path="/index" element={<IndexPage />} />
         <Route path="/trash" element={<TrashPage />} />
+        <Route path="/backup" element={<BackupPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/logs" element={<LogsPage />} />
       </Routes>

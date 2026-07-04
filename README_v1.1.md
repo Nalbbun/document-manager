@@ -2,7 +2,7 @@
 
 로컬 PC에서 PDF, Markdown, TXT 문서를 등록, 검색, 열람하고 문서를 안전하게 정리할 수 있는 Local Web 문서관리 프로그램입니다.
 
-v1.1은 v1.0의 기본 기능에 문서 이동, 문서명 변경, 일괄 작업, 휴지통/복원 기능을 추가한 버전입니다.
+v1.1은 v1.0의 기본 기능에 문서 이동, 문서명 변경, 일괄 작업, 휴지통/복원, 백업/복원, 데이터 정합성 점검 기능을 추가한 버전입니다.
 
 ## 주요 구성
 
@@ -31,7 +31,13 @@ v1.1은 v1.0의 기본 기능에 문서 이동, 문서명 변경, 일괄 작업,
 - 문서 복원
 - 문서 영구 삭제
 - 휴지통 비우기
-- 인덱스 상태 조회 및 재생성
+- 전체 백업 생성
+- 백업 ZIP 다운로드
+- 백업 검증
+- 백업 복원
+- 데이터 정합성 점검
+- 인덱스 자동 복구
+- 복구 결과 리포트
 - 작업 중 메뉴 이동 잠금
 - 로그 조회
 - 환경 설정 관리
@@ -133,28 +139,22 @@ data/
     trash-index.json
   backup/
     backup-index.json
+    document-manager-backup-YYYYMMDD-HHMMSS.zip
 ```
 
-## Git 포함/제외 기준
+## 메뉴 구조
 
-Git에는 다음 항목만 포함합니다.
-
-- Backend/Frontend 소스 코드
-- README 및 기능 정리 문서
-- 설정 예시 파일
-- 빈 런타임 디렉터리 유지를 위한 `.gitkeep`
-
-다음 항목은 Git에 포함하지 않습니다.
-
-- 실제 업로드 문서
-- 런타임 인덱스 JSON
-- 로그 파일
-- 휴지통 데이터 파일
-- 백업 데이터 파일
-- `.env`
-- `.venv`
-- `node_modules`
-- `dist`
+```text
+대시보드
+파일 등록
+문서/폴더
+검색
+인덱스 관리
+휴지통
+백업/복원
+설정
+로그
+```
 
 ## 주요 화면
 
@@ -165,7 +165,7 @@ Git에는 다음 항목만 포함합니다.
 - 최근 등록 문서
 - 폴더별 문서 수
 
-### 등록
+### 파일 등록
 
 - 파일 선택 등록
 - 폴더 경로 등록
@@ -191,11 +191,14 @@ Git에는 다음 항목만 포함합니다.
 - 검색어 하이라이트
 - 검색 결과에서 모달 뷰어 열기
 
-### 인덱스
+### 인덱스 관리
 
 - 인덱스 상태 조회
 - 전체 인덱스 재생성
 - 파일별 인덱스 재생성
+- 데이터 정합성 점검
+- 인덱스 자동 복구
+- 복구 결과 리포트
 - 인덱스 작업 중 이동 잠금
 
 ### 휴지통
@@ -204,6 +207,16 @@ Git에는 다음 항목만 포함합니다.
 - 선택 폴더로 복원
 - 영구 삭제
 - 휴지통 비우기
+
+### 백업/복원
+
+- 전체 백업 ZIP 생성
+- 백업 이력 조회
+- 백업 파일 다운로드
+- 복원 전 백업 구조 검증
+- 백업 복원
+- 복원 전 현재 데이터 자동 백업
+- 복원 작업 중 메뉴 이동 잠금
 
 ### 설정
 
@@ -245,6 +258,23 @@ DELETE /api/trash/{trash_id}
 DELETE /api/trash
 ```
 
+### Backups
+
+```text
+GET  /api/backups
+POST /api/backups
+GET  /api/backups/{backup_id}/download
+POST /api/backups/{backup_id}/validate
+POST /api/backups/{backup_id}/restore
+```
+
+### Maintenance
+
+```text
+GET  /api/maintenance/integrity
+POST /api/maintenance/repair
+```
+
 ### Folders
 
 ```text
@@ -270,20 +300,37 @@ PUT /api/config
 GET /api/logs/{type}
 ```
 
+## Git 포함/제외 기준
+
+Git에는 다음 항목만 포함합니다.
+
+- Backend/Frontend 소스 코드
+- README 및 기능 정리 문서
+- 설정 예시 파일
+- 빈 런타임 디렉터리 유지를 위한 `.gitkeep`
+
+다음 항목은 Git에 포함하지 않습니다.
+
+- 실제 업로드 문서
+- 런타임 인덱스 JSON
+- 로그 파일
+- 휴지통 데이터 파일
+- 백업 ZIP 파일
+- 백업 인덱스 파일
+- `.env`
+- `.venv`
+- `node_modules`
+- `dist`
+
 ## v1.1 구현 커밋
 
 ```text
 081b366 Implement document manager v1.1 stage 1-3
+ecf41b0 Add v1.1 documentation
 ```
 
 ## v1.1 이후 보완 후보
 
-- 백업 ZIP 생성
-- 백업 다운로드
-- 백업 복원
-- 복원 전 검증
-- 데이터 정합성 점검
-- 인덱스 자동 복구
 - 해시 기반 중복 파일 검사 UI
 - 태그/즐겨찾기/메모 관리 UI
 - 검색 조건 확장

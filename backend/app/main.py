@@ -9,11 +9,13 @@ from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.core.logger import configure_logging
 from app.routers import (
+    backup_router,
     config_router,
     document_router,
     folder_router,
     index_router,
     log_router,
+    maintenance_router,
     search_router,
     trash_router,
     upload_router,
@@ -61,5 +63,7 @@ app.include_router(document_router.router)
 app.include_router(search_router.router)
 app.include_router(index_router.router)
 app.include_router(trash_router.router)
+app.include_router(backup_router.router)
+app.include_router(maintenance_router.router)
 app.include_router(config_router.router)
 app.include_router(log_router.router)

@@ -1,4 +1,5 @@
 import {
+  Archive,
   FileSearch,
   Files,
   Gauge,
@@ -15,11 +16,12 @@ import { useOperation } from '../contexts/OperationContext';
 
 const items = [
   { to: '/', label: '대시보드', icon: Gauge },
-  { to: '/upload', label: '등록', icon: UploadCloud },
+  { to: '/upload', label: '파일 등록', icon: UploadCloud },
   { to: '/documents', label: '문서/폴더', icon: Files },
   { to: '/search', label: '검색', icon: Search },
-  { to: '/index', label: '인덱스', icon: ListChecks },
+  { to: '/index', label: '인덱스 관리', icon: ListChecks },
   { to: '/trash', label: '휴지통', icon: Trash2 },
+  { to: '/backup', label: '백업/복원', icon: Archive },
   { to: '/settings', label: '설정', icon: Settings },
   { to: '/logs', label: '로그', icon: History }
 ];

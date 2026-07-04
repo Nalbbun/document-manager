@@ -699,6 +699,17 @@ mark {
   align-items: center;
 }
 
+.maintenance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.compact-table table {
+  min-width: 620px;
+}
+
 .clickable-row {
   cursor: pointer;
 }
