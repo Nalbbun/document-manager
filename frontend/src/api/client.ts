@@ -3,12 +3,15 @@ import type {
   BackupItem,
   BackupValidation,
   DocumentItem,
+  DuplicateGroup,
   Folder,
   IntegrityReport,
   IndexStatus,
   PreviewResponse,
   RepairReport,
+  SearchHistoryItem,
   SearchResult,
+  TagSummary,
   TrashItem,
   UploadResult
 } from '../types/models';
@@ -60,11 +63,21 @@ export const api = {
   updateFolder: (folderId: string, folderName: string) =>
     request(`/api/folders/${folderId}`, { method: 'PUT', body: { folderName } }),
   deleteFolder: (folderId: string) => request(`/api/folders/${folderId}`, { method: 'DELETE' }),
-  documents: (params: Record<string, string | undefined> = {}) =>
+  documents: (params: Record<string, string | number | boolean | undefined> = {}) =>
     request<{ documents: DocumentItem[] }>(`/api/documents${query(params)}`),
   document: (documentId: string) => request<{ document: DocumentItem }>(`/api/documents/${documentId}`),
   preview: (documentId: string) => request<PreviewResponse>(`/api/documents/${documentId}/preview`),
   deleteDocument: (documentId: string) => request(`/api/documents/${documentId}`, { method: 'DELETE' }),
+  documentTags: () => request<{ items: TagSummary[] }>('/api/documents/tags'),
+  duplicateDocuments: () => request<{ items: DuplicateGroup[] }>('/api/documents/duplicates'),
+  updateDocumentMetadata: (
+    documentId: string,
+    payload: Partial<Pick<DocumentItem, 'tags' | 'favorite' | 'pinned' | 'memo'>>
+  ) =>
+    request<{ success: boolean; message: string; document: DocumentItem }>(`/api/documents/${documentId}/metadata`, {
+      method: 'PATCH',
+      body: payload
+    }),
   moveDocument: (documentId: string, folderId: string) =>
     request<{ success: boolean; message: string; document: DocumentItem }>(`/api/documents/${documentId}/move`, {
       method: 'PATCH',
@@ -93,6 +106,15 @@ export const api = {
       succeeded: TrashItem[];
       failed: Array<{ documentId: string; reason: string }>;
     }>('/api/documents/bulk/delete', { method: 'POST', body: { documentIds } }),
+  bulkDocumentTags: (documentIds: string[], tags: string[], mode: 'replace' | 'add' | 'remove' = 'add') =>
+    request<{
+      success: boolean;
+      message: string;
+      successCount: number;
+      failCount: number;
+      succeeded: DocumentItem[];
+      failed: Array<{ documentId: string; reason: string }>;
+    }>('/api/documents/bulk/tags', { method: 'POST', body: { documentIds, tags, mode } }),
   upload: (folderId: string, files: FileList, onProgress?: (percent: number) => void) => {
     const form = new FormData();
     form.set('folderId', folderId);
@@ -104,10 +126,13 @@ export const api = {
       method: 'POST',
       body: { folderId, sourcePath, recursive }
     }),
-  search: (params: Record<string, string | boolean | undefined>) =>
+  search: (params: Record<string, string | boolean | undefined | null>) =>
     request<{ success: boolean; keyword: string; resultCount: number; results: SearchResult[] }>(
       `/api/search${query(params)}`
     ),
+  searchHistory: (limit = 30) => request<{ items: SearchHistoryItem[] }>(`/api/search/history${query({ limit })}`),
+  clearSearchHistory: () =>
+    request<{ success: boolean; message: string; deletedCount: number }>('/api/search/history', { method: 'DELETE' }),
   indexStatus: () => request<IndexStatus>('/api/index/status'),
   rebuildIndex: () =>
     request<{ success: boolean; message: string; successCount: number; failCount: number; status: IndexStatus }>(

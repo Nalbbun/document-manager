@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 from app.core.config import settings
 from app.core.logger import now_iso, write_audit
 from app.repositories.document_repository import read_documents, write_documents
@@ -28,6 +30,8 @@ def check_integrity() -> dict:
         file_path = ensure_within_root(settings.project_root / document["filePath"], settings.storage_root)
         if not file_path.exists():
             issues.append(_issue("MISSING_FILE", "문서 메타정보는 있으나 실제 파일이 없습니다.", "repairable", document))
+        elif not document.get("fileHash"):
+            issues.append(_issue("MISSING_FILE_HASH", "문서 파일 해시가 비어 있습니다.", "repairable", document))
         if document.get("searchable") and document["documentId"] not in search_document_ids:
             issues.append(_issue("MISSING_SEARCH_INDEX", "검색 가능한 문서이나 검색 인덱스가 없습니다.", "repairable", document))
 
@@ -130,6 +134,12 @@ def repair_integrity() -> dict:
             actions.append(_action("MARK_MISSING_FILE_FAILED", document["documentId"], document["displayName"]))
             continue
 
+        if not document.get("fileHash"):
+            document["fileHash"] = hashlib.sha256(file_path.read_bytes()).hexdigest()
+            document["updatedAt"] = now_iso()
+            changed_documents = True
+            actions.append(_action("REBUILD_FILE_HASH", document["documentId"], document["displayName"]))
+
         has_search = any(item["documentId"] == document["documentId"] for item in search_items)
         if document.get("searchable") and not has_search:
             extraction = extract_text(file_path, document["extension"])
@@ -147,6 +157,9 @@ def repair_integrity() -> dict:
                     "fileName": document["fileName"],
                     "extension": document["extension"],
                     "filePath": document["filePath"],
+                    "tags": document.get("tags", []),
+                    "favorite": bool(document.get("favorite")),
+                    "pinned": bool(document.get("pinned")),
                     "locations": extraction["locations"],
                 }
             )

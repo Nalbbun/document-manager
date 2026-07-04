@@ -1,50 +1,167 @@
-import { Eye, Search } from 'lucide-react';
-import { FormEvent, useEffect, useState } from 'react';
+import { Clock, Eye, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { DocumentViewerModal, type ViewerTarget } from '../components/DocumentViewerModal';
 import { HighlightedText } from '../components/HighlightedText';
-import type { DocumentItem, Folder, SearchResult } from '../types/models';
+import type { DocumentItem, Folder, SearchHistoryItem, SearchResult, TagSummary } from '../types/models';
+
+type SearchParams = Record<string, string | boolean | undefined | null>;
 
 export default function SearchPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [tags, setTags] = useState<TagSummary[]>([]);
+  const [history, setHistory] = useState<SearchHistoryItem[]>([]);
   const [keyword, setKeyword] = useState('');
+  const [excludeKeyword, setExcludeKeyword] = useState('');
   const [scope, setScope] = useState('all');
   const [folderId, setFolderId] = useState('');
   const [documentId, setDocumentId] = useState('');
   const [extension, setExtension] = useState('');
+  const [tag, setTag] = useState('');
+  const [matchMode, setMatchMode] = useState('contains');
+  const [sort, setSort] = useState('relevance');
+  const [favoriteFilter, setFavoriteFilter] = useState('');
+  const [pinnedFilter, setPinnedFilter] = useState('');
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [exactMatch, setExactMatch] = useState(false);
+  const [resultKeyword, setResultKeyword] = useState('');
+  const [resultCount, setResultCount] = useState(0);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [error, setError] = useState('');
   const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
 
+  const loadBaseData = async () => {
+    const [folderResponse, documentResponse, tagResponse, historyResponse] = await Promise.all([
+      api.folders(),
+      api.documents(),
+      api.documentTags(),
+      api.searchHistory()
+    ]);
+    setFolders(folderResponse.folders);
+    setDocuments(documentResponse.documents);
+    setTags(tagResponse.items);
+    setHistory(historyResponse.items);
+  };
+
   useEffect(() => {
-    Promise.all([api.folders(), api.documents()])
-      .then(([folderResponse, documentResponse]) => {
-        setFolders(folderResponse.folders);
-        setDocuments(documentResponse.documents);
-      })
-      .catch((err) => setError(err.message));
+    loadBaseData().catch((err) => setError(err.message));
   }, []);
+
+  const filteredDocuments = useMemo(() => {
+    if (scope !== 'document' || !folderId) return documents;
+    return documents.filter((document) => document.folderId === folderId);
+  }, [documents, folderId, scope]);
+
+  const buildParams = (): SearchParams => ({
+    keyword,
+    excludeKeyword,
+    scope,
+    folderId: scope === 'folder' ? folderId : undefined,
+    documentId: scope === 'document' ? documentId : undefined,
+    extension,
+    tag,
+    matchMode,
+    sort,
+    favorite: favoriteFilter === '' ? undefined : favoriteFilter === 'true',
+    pinned: pinnedFilter === '' ? undefined : pinnedFilter === 'true',
+    caseSensitive,
+    exactMatch
+  });
+
+  const runSearch = async (params: SearchParams) => {
+    const response = await api.search(params);
+    setResults(response.results);
+    setResultCount(response.resultCount);
+    setResultKeyword(String(params.keyword || ''));
+    const historyResponse = await api.searchHistory();
+    setHistory(historyResponse.items);
+  };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     try {
       setError('');
-      const response = await api.search({
-        keyword,
-        scope,
-        folderId: scope === 'folder' ? folderId : undefined,
-        documentId: scope === 'document' ? documentId : undefined,
-        extension,
-        caseSensitive,
-        exactMatch
-      });
-      setResults(response.results);
+      await runSearch(buildParams());
     } catch (err) {
-      setError(err instanceof Error ? err.message : '검색 실패');
+      setError(err instanceof Error ? err.message : '검색에 실패했습니다.');
     }
+  };
+
+  const applyHistory = async (item: SearchHistoryItem) => {
+    const filters = item.filters || {};
+    const nextScope = filters.scope || 'all';
+    const nextFolderId = filters.folderId || '';
+    const nextDocumentId = filters.documentId || '';
+    const nextExtension = filters.extension || '';
+    const nextTag = filters.tag || '';
+    const nextMatchMode = filters.matchMode || 'contains';
+    const nextSort = filters.sort || 'relevance';
+    const nextFavorite = filters.favorite === null || filters.favorite === undefined ? '' : String(filters.favorite);
+    const nextPinned = filters.pinned === null || filters.pinned === undefined ? '' : String(filters.pinned);
+    const nextExclude = filters.excludeKeyword || '';
+    const nextCaseSensitive = Boolean(filters.caseSensitive);
+    const nextExactMatch = Boolean(filters.exactMatch);
+
+    setKeyword(item.keyword);
+    setExcludeKeyword(nextExclude);
+    setScope(nextScope);
+    setFolderId(nextFolderId);
+    setDocumentId(nextDocumentId);
+    setExtension(nextExtension);
+    setTag(nextTag);
+    setMatchMode(nextMatchMode);
+    setSort(nextSort);
+    setFavoriteFilter(nextFavorite);
+    setPinnedFilter(nextPinned);
+    setCaseSensitive(nextCaseSensitive);
+    setExactMatch(nextExactMatch);
+
+    try {
+      setError('');
+      await runSearch({
+        keyword: item.keyword,
+        excludeKeyword: nextExclude,
+        scope: nextScope,
+        folderId: nextScope === 'folder' ? nextFolderId : undefined,
+        documentId: nextScope === 'document' ? nextDocumentId : undefined,
+        extension: nextExtension,
+        tag: nextTag,
+        matchMode: nextMatchMode,
+        sort: nextSort,
+        favorite: nextFavorite === '' ? undefined : nextFavorite === 'true',
+        pinned: nextPinned === '' ? undefined : nextPinned === 'true',
+        caseSensitive: nextCaseSensitive,
+        exactMatch: nextExactMatch
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '검색 이력을 다시 실행하지 못했습니다.');
+    }
+  };
+
+  const clearHistory = async () => {
+    try {
+      setError('');
+      await api.clearSearchHistory();
+      setHistory([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '검색 이력을 삭제하지 못했습니다.');
+    }
+  };
+
+  const resetConditions = () => {
+    setExcludeKeyword('');
+    setScope('all');
+    setFolderId('');
+    setDocumentId('');
+    setExtension('');
+    setTag('');
+    setMatchMode('contains');
+    setSort('relevance');
+    setFavoriteFilter('');
+    setPinnedFilter('');
+    setCaseSensitive(false);
+    setExactMatch(false);
   };
 
   return (
@@ -52,14 +169,21 @@ export default function SearchPage() {
       <div className="page-header">
         <div>
           <h1>문서 검색</h1>
-          <p>키워드, 범위, 파일 유형 기반 검색</p>
+          <p>키워드, 태그, 즐겨찾기, 상세 조건 기반 검색</p>
         </div>
       </div>
 
       {error && <div className="alert error">{error}</div>}
 
-      <form className="search-panel" onSubmit={submit}>
+      <form className="search-panel advanced-search-panel" onSubmit={submit}>
         <input value={keyword} onChange={(event) => setKeyword(event.target.value)} placeholder="검색어" />
+        <input value={excludeKeyword} onChange={(event) => setExcludeKeyword(event.target.value)} placeholder="제외어" />
+        <select value={matchMode} onChange={(event) => setMatchMode(event.target.value)}>
+          <option value="contains">일반</option>
+          <option value="and">AND</option>
+          <option value="or">OR</option>
+          <option value="phrase">문구</option>
+        </select>
         <select value={scope} onChange={(event) => setScope(event.target.value)}>
           <option value="all">전체</option>
           <option value="folder">폴더</option>
@@ -78,7 +202,7 @@ export default function SearchPage() {
         {scope === 'document' && (
           <select value={documentId} onChange={(event) => setDocumentId(event.target.value)}>
             <option value="">문서 선택</option>
-            {documents.map((document) => (
+            {filteredDocuments.map((document) => (
               <option key={document.documentId} value={document.documentId}>
                 {document.displayName}
               </option>
@@ -91,6 +215,29 @@ export default function SearchPage() {
           <option value="md">MD</option>
           <option value="txt">TXT</option>
         </select>
+        <select value={tag} onChange={(event) => setTag(event.target.value)}>
+          <option value="">전체 태그</option>
+          {tags.map((item) => (
+            <option key={item.tag} value={item.tag}>
+              {item.tag} ({item.count})
+            </option>
+          ))}
+        </select>
+        <select value={favoriteFilter} onChange={(event) => setFavoriteFilter(event.target.value)}>
+          <option value="">즐겨찾기 전체</option>
+          <option value="true">즐겨찾기만</option>
+          <option value="false">즐겨찾기 제외</option>
+        </select>
+        <select value={pinnedFilter} onChange={(event) => setPinnedFilter(event.target.value)}>
+          <option value="">고정 전체</option>
+          <option value="true">고정만</option>
+          <option value="false">고정 제외</option>
+        </select>
+        <select value={sort} onChange={(event) => setSort(event.target.value)}>
+          <option value="relevance">관련도순</option>
+          <option value="createdAt">최신순</option>
+          <option value="fileName">문서명순</option>
+        </select>
         <label className="check-row">
           <input type="checkbox" checked={caseSensitive} onChange={(event) => setCaseSensitive(event.target.checked)} />
           대소문자
@@ -99,75 +246,125 @@ export default function SearchPage() {
           <input type="checkbox" checked={exactMatch} onChange={(event) => setExactMatch(event.target.checked)} />
           정확히
         </label>
+        <button className="icon-text-button" type="button" onClick={resetConditions} title="조건 초기화">
+          <RotateCcw size={17} />
+          초기화
+        </button>
         <button className="icon-text-button primary" title="검색">
           <Search size={17} />
           검색
         </button>
       </form>
 
-      <section className="panel">
-        <div className="section-header">
-          <h2>검색 결과</h2>
-          <span>{results.length.toLocaleString()}건</span>
-        </div>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>문서명</th>
-                <th>폴더</th>
-                <th>유형</th>
-                <th>위치</th>
-                <th>내용</th>
-                <th>열기</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((result, index) => (
-                <tr key={`${result.documentId}-${result.pageNumber}-${result.lineNumber}-${index}`}>
-                  <td>{result.displayName}</td>
-                  <td>{result.folderName}</td>
-                  <td className="uppercase">{result.extension}</td>
-                  <td>{formatLocation(result)}</td>
-                  <td className="snippet">
-                    <HighlightedText text={result.snippet} keyword={keyword} />
-                  </td>
-                  <td>
-                    <button
-                      className="icon-button"
-                      onClick={() =>
-                        setViewerTarget({
-                          documentId: result.documentId,
-                          keyword,
-                          page: result.pageNumber,
-                          line: result.lineNumber
-                        })
-                      }
-                      title="열기"
-                    >
-                      <Eye size={16} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {results.length === 0 && (
+      <div className="history-layout">
+        <section className="panel search-history-panel">
+          <div className="section-header">
+            <h2>최근 검색</h2>
+            <button className="icon-button danger" onClick={clearHistory} disabled={!history.length} title="검색 이력 삭제">
+              <Trash2 size={16} />
+            </button>
+          </div>
+          <div className="history-list">
+            {history.map((item) => (
+              <button className="history-row" key={item.historyId} onClick={() => void applyHistory(item)}>
+                <Clock size={15} />
+                <span>
+                  <strong>{item.keyword}</strong>
+                  <small>
+                    {formatDate(item.searchedAt)} · {item.resultCount.toLocaleString()}건
+                  </small>
+                </span>
+              </button>
+            ))}
+            {history.length === 0 && <div className="empty history-empty">검색 이력이 없습니다.</div>}
+          </div>
+        </section>
+
+        <section className="panel search-result-panel">
+          <div className="section-header">
+            <h2>검색 결과</h2>
+            <span>{resultCount.toLocaleString()}건</span>
+          </div>
+          <div className="table-wrap">
+            <table>
+              <thead>
                 <tr>
-                  <td colSpan={6} className="empty">
-                    검색 결과가 없습니다.
-                  </td>
+                  <th>문서명</th>
+                  <th>폴더</th>
+                  <th>유형</th>
+                  <th>위치</th>
+                  <th>내용</th>
+                  <th>열기</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {results.map((result, index) => (
+                  <tr key={`${result.documentId}-${result.pageNumber}-${result.lineNumber}-${result.locationType}-${index}`}>
+                    <td>
+                      <div className="result-title">
+                        <span>{result.displayName}</span>
+                        {(result.favorite || result.pinned) && (
+                          <small>{[result.favorite ? '즐겨찾기' : '', result.pinned ? '고정' : ''].filter(Boolean).join(' · ')}</small>
+                        )}
+                      </div>
+                      {result.tags.length > 0 && (
+                        <div className="tag-chip-row">
+                          {result.tags.map((item) => (
+                            <span className="tag-chip" key={`${result.documentId}-${item}`}>
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td>{result.folderName}</td>
+                    <td className="uppercase">{result.extension}</td>
+                    <td>{formatLocation(result)}</td>
+                    <td className="snippet">
+                      <HighlightedText text={result.snippet} keyword={resultKeyword} />
+                    </td>
+                    <td>
+                      <button
+                        className="icon-button"
+                        onClick={() =>
+                          setViewerTarget({
+                            documentId: result.documentId,
+                            keyword: resultKeyword,
+                            page: result.pageNumber,
+                            line: result.lineNumber
+                          })
+                        }
+                        title="열기"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {results.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="empty">
+                      검색 결과가 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
       <DocumentViewerModal target={viewerTarget} onClose={() => setViewerTarget(null)} />
     </section>
   );
 }
 
 function formatLocation(result: SearchResult) {
+  if (result.locationType === 'META') return '문서 정보';
   if (result.pageNumber) return `${result.pageNumber}페이지`;
   if (result.lineNumber) return `${result.lineNumber}줄`;
   return '-';
+}
+
+function formatDate(value: string) {
+  return value ? value.slice(0, 16).replace('T', ' ') : '';
 }

@@ -62,6 +62,38 @@ export type BackupValidation = {
   badFile: string | null;
 };
 
+export type TagSummary = {
+  tag: string;
+  count: number;
+};
+
+export type DuplicateGroup = {
+  fileHash: string;
+  count: number;
+  documents: DocumentItem[];
+};
+
+export type SearchHistoryItem = {
+  historyId: string;
+  keyword: string;
+  filters: {
+    scope?: string;
+    folderId?: string | null;
+    documentId?: string | null;
+    extension?: string | null;
+    caseSensitive?: boolean;
+    exactMatch?: boolean;
+    matchMode?: string;
+    excludeKeyword?: string | null;
+    tag?: string | null;
+    favorite?: boolean | null;
+    pinned?: boolean | null;
+    sort?: string;
+  };
+  resultCount: number;
+  searchedAt: string;
+};
+
 export type IntegrityIssue = {
   type: string;
   severity: string;
@@ -105,6 +137,12 @@ export type SearchResult = {
   snippet: string;
   filePath: string;
   viewerUrl: string;
+  tags: string[];
+  favorite: boolean;
+  pinned: boolean;
+  memo: string;
+  createdAt: string;
+  score: number;
 };
 
 export type IndexStatus = {

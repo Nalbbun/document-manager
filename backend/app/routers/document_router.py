@@ -3,7 +3,14 @@ from __future__ import annotations
 from fastapi import APIRouter, Query
 from fastapi.responses import FileResponse
 
-from app.models.schemas import BulkDocumentMoveRequest, BulkDocumentRequest, DocumentMoveRequest, DocumentRenameRequest
+from app.models.schemas import (
+    BulkDocumentMoveRequest,
+    BulkDocumentRequest,
+    BulkDocumentTagRequest,
+    DocumentMetadataUpdate,
+    DocumentMoveRequest,
+    DocumentRenameRequest,
+)
 from app.services import document_service
 
 
@@ -15,6 +22,9 @@ def get_documents(
     folderId: str | None = None,
     extension: str | None = None,
     keyword: str | None = None,
+    tag: str | None = None,
+    favorite: bool | None = None,
+    pinned: bool | None = None,
     sort: str = Query("createdAt"),
     order: str = Query("desc"),
 ) -> dict:
@@ -23,10 +33,23 @@ def get_documents(
             folder_id=folderId,
             extension=extension,
             keyword=keyword,
+            tag=tag,
+            favorite=favorite,
+            pinned=pinned,
             sort=sort,
             order=order,
         )
     }
+
+
+@router.get("/tags")
+def get_document_tags() -> dict:
+    return {"items": document_service.list_tags()}
+
+
+@router.get("/duplicates")
+def get_duplicate_documents() -> dict:
+    return {"items": document_service.list_duplicate_documents()}
 
 
 @router.post("/bulk/move")
@@ -41,6 +64,12 @@ def bulk_delete_documents(payload: BulkDocumentRequest) -> dict:
     return {"success": result["failCount"] == 0, "message": "선택 문서가 휴지통으로 이동되었습니다.", **result}
 
 
+@router.post("/bulk/tags")
+def bulk_update_document_tags(payload: BulkDocumentTagRequest) -> dict:
+    result = document_service.bulk_update_document_tags(payload.documentIds, payload.tags, payload.mode)
+    return {"success": result["failCount"] == 0, "message": "문서 태그 일괄 처리가 완료되었습니다.", **result}
+
+
 @router.patch("/{document_id}/move")
 def move_document(document_id: str, payload: DocumentMoveRequest) -> dict:
     document = document_service.move_document(document_id, payload.folderId)
@@ -51,6 +80,18 @@ def move_document(document_id: str, payload: DocumentMoveRequest) -> dict:
 def rename_document(document_id: str, payload: DocumentRenameRequest) -> dict:
     document = document_service.rename_document(document_id, payload.fileName)
     return {"success": True, "message": "문서명이 변경되었습니다.", "document": document}
+
+
+@router.patch("/{document_id}/metadata")
+def update_document_metadata(document_id: str, payload: DocumentMetadataUpdate) -> dict:
+    document = document_service.update_document_metadata(
+        document_id,
+        tags=payload.tags,
+        favorite=payload.favorite,
+        pinned=payload.pinned,
+        memo=payload.memo,
+    )
+    return {"success": True, "message": "문서 분류 정보가 수정되었습니다.", "document": document}
 
 
 @router.get("/{document_id}/file")

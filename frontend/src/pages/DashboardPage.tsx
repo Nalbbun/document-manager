@@ -45,6 +45,10 @@ export default function DashboardPage() {
   }, [documents]);
 
   const recent = [...documents].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8);
+  const favorites = [...documents]
+    .filter((document) => document.favorite || document.pinned)
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 8);
 
   return (
     <section className="page">
@@ -131,6 +135,61 @@ export default function DashboardPage() {
           </div>
         </section>
       </div>
+      <section className="panel">
+        <div className="section-header">
+          <h2>즐겨찾기 문서</h2>
+          <span>{favorites.length.toLocaleString()}개</span>
+        </div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>문서명</th>
+                <th>폴더</th>
+                <th>태그</th>
+                <th>구분</th>
+              </tr>
+            </thead>
+            <tbody>
+              {favorites.map((document) => (
+                <tr key={document.documentId}>
+                  <td>
+                    <button
+                      className="text-link-button"
+                      onClick={() => setViewerTarget({ documentId: document.documentId })}
+                      title="문서 열기"
+                    >
+                      {document.displayName}
+                    </button>
+                  </td>
+                  <td>{document.folderName}</td>
+                  <td>
+                    {document.tags.length > 0 ? (
+                      <div className="tag-chip-row">
+                        {document.tags.map((tag) => (
+                          <span className="tag-chip" key={`${document.documentId}-${tag}`}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                  <td>{[document.pinned ? '고정' : '', document.favorite ? '즐겨찾기' : ''].filter(Boolean).join(' · ')}</td>
+                </tr>
+              ))}
+              {favorites.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="empty">
+                    즐겨찾기 문서가 없습니다.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
       <DocumentViewerModal target={viewerTarget} onClose={() => setViewerTarget(null)} />
     </section>
   );

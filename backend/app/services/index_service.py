@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+
 from app.core.config import settings
 from app.core.logger import now_iso, write_audit
 from app.repositories.document_repository import read_documents, write_documents
@@ -39,6 +41,7 @@ def rebuild_all_indexes() -> dict:
             continue
 
         extraction = extract_text(file_path, document["extension"])
+        document["fileHash"] = hashlib.sha256(file_path.read_bytes()).hexdigest()
         document["pageCount"] = extraction["pageCount"]
         document["lineCount"] = extraction["lineCount"]
         document["searchable"] = extraction["searchable"]
@@ -58,6 +61,9 @@ def rebuild_all_indexes() -> dict:
                 "fileName": document["fileName"],
                 "extension": document["extension"],
                 "filePath": document["filePath"],
+                "tags": document.get("tags", []),
+                "favorite": bool(document.get("favorite")),
+                "pinned": bool(document.get("pinned")),
                 "locations": extraction["locations"],
             }
         )
@@ -95,6 +101,7 @@ def rebuild_document_index(document_id: str) -> dict:
         return {"successCount": 0, "failCount": 1, "document": document, "status": get_index_status()}
 
     extraction = extract_text(file_path, document["extension"])
+    document["fileHash"] = hashlib.sha256(file_path.read_bytes()).hexdigest()
     document["pageCount"] = extraction["pageCount"]
     document["lineCount"] = extraction["lineCount"]
     document["searchable"] = extraction["searchable"]
@@ -111,6 +118,9 @@ def rebuild_document_index(document_id: str) -> dict:
             "fileName": document["fileName"],
             "extension": document["extension"],
             "filePath": document["filePath"],
+            "tags": document.get("tags", []),
+            "favorite": bool(document.get("favorite")),
+            "pinned": bool(document.get("pinned")),
             "locations": extraction["locations"],
         }
     )

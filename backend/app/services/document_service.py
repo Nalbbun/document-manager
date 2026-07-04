@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import hashlib
 from pathlib import Path
 
 from fastapi.responses import FileResponse
@@ -20,6 +21,9 @@ def list_documents(
     folder_id: str | None = None,
     extension: str | None = None,
     keyword: str | None = None,
+    tag: str | None = None,
+    favorite: bool | None = None,
+    pinned: bool | None = None,
     sort: str = "createdAt",
     order: str = "desc",
 ) -> list[dict]:
@@ -28,16 +32,30 @@ def list_documents(
         documents = [document for document in documents if document["folderId"] == folder_id]
     if extension:
         documents = [document for document in documents if document["extension"] == extension.lower()]
+    if tag:
+        tag_needle = tag.lower()
+        documents = [
+            document
+            for document in documents
+            if any(str(item).lower() == tag_needle for item in document.get("tags", []))
+        ]
+    if favorite is not None:
+        documents = [document for document in documents if bool(document.get("favorite")) == favorite]
+    if pinned is not None:
+        documents = [document for document in documents if bool(document.get("pinned")) == pinned]
     if keyword:
         needle = keyword.lower()
         documents = [
             document
             for document in documents
-            if needle in document["displayName"].lower() or needle in document["fileName"].lower()
+            if needle in document["displayName"].lower()
+            or needle in document["fileName"].lower()
+            or needle in str(document.get("memo", "")).lower()
+            or any(needle in str(item).lower() for item in document.get("tags", []))
         ]
 
     reverse = order.lower() != "asc"
-    if sort in {"displayName", "fileSize", "createdAt", "extension", "folderName"}:
+    if sort in {"displayName", "fileSize", "createdAt", "updatedAt", "extension", "folderName", "favorite", "pinned"}:
         documents.sort(key=lambda document: document.get(sort) or "", reverse=reverse)
     return documents
 
@@ -110,6 +128,120 @@ def rename_document(document_id: str, file_name: str) -> dict:
     _update_search_index_document(document)
     write_audit("DOCUMENT_RENAME", document_id, new_file_name, "SUCCESS", "문서명 변경 완료", {"before": before, "after": document})
     return document
+
+
+def update_document_metadata(
+    document_id: str,
+    tags: list[str] | None = None,
+    favorite: bool | None = None,
+    pinned: bool | None = None,
+    memo: str | None = None,
+) -> dict:
+    documents = read_documents()
+    document = _find_document(documents, document_id)
+    before = {
+        "tags": list(document.get("tags", [])),
+        "favorite": bool(document.get("favorite")),
+        "pinned": bool(document.get("pinned")),
+        "memo": document.get("memo", ""),
+    }
+
+    if tags is not None:
+        document["tags"] = _normalize_tags(tags)
+    if favorite is not None:
+        document["favorite"] = favorite
+    if pinned is not None:
+        document["pinned"] = pinned
+    if memo is not None:
+        document["memo"] = memo.strip()
+
+    document["updatedAt"] = now_iso()
+    write_documents(documents)
+    _update_search_index_document(document)
+    write_audit(
+        "DOCUMENT_METADATA_UPDATE",
+        document_id,
+        document["fileName"],
+        "SUCCESS",
+        "문서 분류 정보가 수정되었습니다.",
+        {"before": before, "after": document},
+    )
+    return document
+
+
+def bulk_update_document_tags(document_ids: list[str], tags: list[str], mode: str = "add") -> dict:
+    documents = read_documents()
+    normalized_tags = _normalize_tags(tags)
+    succeeded: list[dict] = []
+    failed: list[dict] = []
+
+    for document_id in document_ids:
+        try:
+            document = _find_document(documents, document_id)
+            current_tags = _normalize_tags(document.get("tags", []))
+            if mode == "replace":
+                next_tags = normalized_tags
+            elif mode == "remove":
+                remove_set = {tag.lower() for tag in normalized_tags}
+                next_tags = [tag for tag in current_tags if tag.lower() not in remove_set]
+            else:
+                next_tags = _normalize_tags([*current_tags, *normalized_tags])
+            document["tags"] = next_tags
+            document["updatedAt"] = now_iso()
+            succeeded.append(document)
+        except AppError as exc:
+            failed.append({"documentId": document_id, "reason": exc.message})
+        except Exception as exc:
+            failed.append({"documentId": document_id, "reason": str(exc)})
+
+    write_documents(documents)
+    for document in succeeded:
+        _update_search_index_document(document)
+    write_audit(
+        "DOCUMENT_TAG_BULK_UPDATE",
+        None,
+        None,
+        "SUCCESS" if not failed else "PARTIAL",
+        "문서 태그 일괄 처리가 완료되었습니다.",
+        {"mode": mode, "successCount": len(succeeded), "failCount": len(failed), "tags": normalized_tags},
+    )
+    return {"successCount": len(succeeded), "failCount": len(failed), "succeeded": succeeded, "failed": failed}
+
+
+def list_tags() -> list[dict]:
+    counts: dict[str, int] = {}
+    labels: dict[str, str] = {}
+    for document in read_documents():
+        for tag in document.get("tags", []):
+            key = str(tag).lower()
+            counts[key] = counts.get(key, 0) + 1
+            labels.setdefault(key, str(tag))
+    return [
+        {"tag": labels[key], "count": counts[key]}
+        for key in sorted(counts, key=lambda item: (-counts[item], labels[item].lower()))
+    ]
+
+
+def list_duplicate_documents() -> list[dict]:
+    documents = read_documents()
+    changed = _populate_missing_file_hashes(documents)
+    if changed:
+        write_documents(documents)
+
+    groups: dict[str, list[dict]] = {}
+    for document in documents:
+        file_hash = document.get("fileHash")
+        if not file_hash:
+            continue
+        groups.setdefault(file_hash, []).append(document)
+
+    duplicates = [
+        {"fileHash": file_hash, "count": len(items), "documents": items}
+        for file_hash, items in groups.items()
+        if len(items) > 1
+    ]
+    duplicates.sort(key=lambda item: item["count"], reverse=True)
+    return duplicates
 
 
 def bulk_move_documents(document_ids: list[str], folder_id: str) -> dict:
@@ -356,6 +488,9 @@ def _update_search_index_document(document: dict) -> None:
             item["fileName"] = document["fileName"]
             item["extension"] = document["extension"]
             item["filePath"] = document["filePath"]
+            item["tags"] = document.get("tags", [])
+            item["favorite"] = bool(document.get("favorite"))
+            item["pinned"] = bool(document.get("pinned"))
     write_items(items)
 
 
@@ -367,6 +502,9 @@ def _search_item(document: dict, locations: list[dict]) -> dict:
         "fileName": document["fileName"],
         "extension": document["extension"],
         "filePath": document["filePath"],
+        "tags": document.get("tags", []),
+        "favorite": bool(document.get("favorite")),
+        "pinned": bool(document.get("pinned")),
         "locations": locations,
     }
 
@@ -384,6 +522,39 @@ def _next_trash_id(items: list[dict]) -> str:
 def _trash_file_path(trash_id: str, file_name: str) -> Path:
     safe_name = safe_file_name(file_name)
     return ensure_within_root(settings.trash_root / "documents" / f"{trash_id}_{safe_name}", settings.trash_root)
+
+
+def _normalize_tags(tags: list[str]) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for tag in tags:
+        value = str(tag).strip()
+        if not value:
+            continue
+        value = value[:40]
+        key = value.lower()
+        if key in seen:
+            continue
+        normalized.append(value)
+        seen.add(key)
+    return normalized[:20]
+
+
+def _populate_missing_file_hashes(documents: list[dict]) -> bool:
+    changed = False
+    for document in documents:
+        if document.get("fileHash"):
+            continue
+        try:
+            file_path = _document_file_path(document)
+            if not file_path.exists():
+                continue
+            document["fileHash"] = hashlib.sha256(file_path.read_bytes()).hexdigest()
+            document["updatedAt"] = now_iso()
+            changed = True
+        except Exception:
+            continue
+    return changed
 
 
 def _refresh_folder_counts() -> None:

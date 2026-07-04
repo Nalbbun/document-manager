@@ -41,6 +41,22 @@ def _duplicate_file_exists(documents: list[dict], folder_id: str, file_name: str
     )
 
 
+def _find_duplicate_hash(documents: list[dict], file_hash: str) -> dict | None:
+    return next((document for document in documents if document.get("fileHash") == file_hash), None)
+
+
+def _populate_missing_file_hashes(documents: list[dict]) -> None:
+    for document in documents:
+        if document.get("fileHash"):
+            continue
+        try:
+            file_path = ensure_within_root(settings.project_root / document["filePath"], settings.storage_root)
+            if file_path.exists():
+                document["fileHash"] = hashlib.sha256(file_path.read_bytes()).hexdigest()
+        except Exception:
+            continue
+
+
 async def upload_files(folder_id: str, files: list[UploadFile]) -> dict:
     folder = get_folder(folder_id)
     folder_path = ensure_within_root(settings.project_root / folder["folderPath"], settings.storage_root)
@@ -137,6 +153,15 @@ def _register_file_content(
     if _duplicate_file_exists(documents, folder["folderId"], file_name):
         raise AppError("동일 폴더에 같은 파일명이 이미 등록되어 있습니다.")
 
+    _populate_missing_file_hashes(documents)
+    file_hash = hashlib.sha256(content).hexdigest()
+    duplicate = _find_duplicate_hash(documents, file_hash)
+    if duplicate:
+        raise AppError(
+            "동일한 내용의 파일이 이미 등록되어 있습니다: "
+            f"{duplicate.get('displayName') or duplicate.get('fileName')} / {duplicate.get('folderName')}"
+        )
+
     target_path = ensure_within_root(folder_path / file_name, settings.storage_root)
     if target_path.exists():
         raise AppError("저장 경로에 같은 파일명이 이미 존재합니다.")
@@ -153,7 +178,7 @@ def _register_file_content(
         "extension": extension,
         "mimeType": guess_mime_type(file_name),
         "fileSize": len(content),
-        "fileHash": hashlib.sha256(content).hexdigest(),
+        "fileHash": file_hash,
         "filePath": relative_to_project(target_path, settings.project_root),
         "pageCount": extraction["pageCount"],
         "lineCount": extraction["lineCount"],
@@ -176,6 +201,9 @@ def _register_file_content(
             "fileName": document["fileName"],
             "extension": document["extension"],
             "filePath": document["filePath"],
+            "tags": document.get("tags", []),
+            "favorite": bool(document.get("favorite")),
+            "pinned": bool(document.get("pinned")),
             "locations": extraction["locations"],
         }
     )

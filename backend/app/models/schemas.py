@@ -27,6 +27,13 @@ class DocumentRenameRequest(BaseModel):
     fileName: str = Field(min_length=1, max_length=180)
 
 
+class DocumentMetadataUpdate(BaseModel):
+    tags: list[str] | None = None
+    favorite: bool | None = None
+    pinned: bool | None = None
+    memo: str | None = Field(default=None, max_length=1000)
+
+
 class BulkDocumentMoveRequest(BaseModel):
     documentIds: list[str] = Field(min_length=1)
     folderId: str
@@ -34,6 +41,12 @@ class BulkDocumentMoveRequest(BaseModel):
 
 class BulkDocumentRequest(BaseModel):
     documentIds: list[str] = Field(min_length=1)
+
+
+class BulkDocumentTagRequest(BaseModel):
+    documentIds: list[str] = Field(min_length=1)
+    tags: list[str] = Field(min_length=1)
+    mode: Literal["replace", "add", "remove"] = "add"
 
 
 class TrashRestoreRequest(BaseModel):
@@ -48,6 +61,12 @@ class SearchQuery(BaseModel):
     extension: str | None = None
     caseSensitive: bool = False
     exactMatch: bool = False
+    matchMode: Literal["contains", "and", "or", "phrase"] = "contains"
+    excludeKeyword: str | None = None
+    tag: str | None = None
+    favorite: bool | None = None
+    pinned: bool | None = None
+    sort: Literal["relevance", "createdAt", "fileName"] = "relevance"
 
 
 class ConfigUpdate(BaseModel):
