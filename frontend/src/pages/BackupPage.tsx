@@ -2,10 +2,12 @@ import { Download, RefreshCcw, RotateCcw, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useOperation } from '../contexts/OperationContext';
+import { useToast } from '../contexts/ToastContext';
 import type { BackupItem, BackupValidation } from '../types/models';
 
 export default function BackupPage() {
   const { startOperation, endOperation } = useOperation();
+  const { showToast } = useToast();
   const [items, setItems] = useState<BackupItem[]>([]);
   const [validation, setValidation] = useState<Record<string, BackupValidation>>({});
   const [message, setMessage] = useState('');
@@ -24,6 +26,16 @@ export default function BackupPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!message) return;
+    showToast({ type: 'success', title: message, durationMs: 6500 });
+  }, [message, showToast]);
+
+  useEffect(() => {
+    if (!error) return;
+    showToast({ type: 'error', title: '오류', message: error, durationMs: 6500 });
+  }, [error, showToast]);
 
   const create = async () => {
     try {

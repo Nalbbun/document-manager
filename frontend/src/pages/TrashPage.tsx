@@ -2,10 +2,12 @@ import { RefreshCcw, RotateCcw, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useOperation } from '../contexts/OperationContext';
+import { useToast } from '../contexts/ToastContext';
 import type { Folder, TrashItem } from '../types/models';
 
 export default function TrashPage() {
   const { startOperation, endOperation } = useOperation();
+  const { showToast } = useToast();
   const [items, setItems] = useState<TrashItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [restoreFolderId, setRestoreFolderId] = useState('');
@@ -27,6 +29,16 @@ export default function TrashPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!message) return;
+    showToast({ type: 'success', title: message });
+  }, [message, showToast]);
+
+  useEffect(() => {
+    if (!error) return;
+    showToast({ type: 'error', title: '오류', message: error, durationMs: 6500 });
+  }, [error, showToast]);
 
   const restore = async (item: TrashItem) => {
     const targetFolderId = restoreFolderId || undefined;

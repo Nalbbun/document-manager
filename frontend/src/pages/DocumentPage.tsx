@@ -16,12 +16,18 @@ import {
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { DocumentViewerModal, type ViewerTarget } from '../components/DocumentViewerModal';
+import { Pagination } from '../components/Pagination';
 import { StatusPill } from '../components/StatusPill';
 import { useOperation } from '../contexts/OperationContext';
+import { useToast } from '../contexts/ToastContext';
 import type { DocumentItem, DuplicateGroup, Folder, TagSummary } from '../types/models';
+
+type SortKey = 'displayName' | 'folderName' | 'extension' | 'fileSize' | 'createdAt' | 'indexStatus';
+type ColumnKey = 'folder' | 'extension' | 'fileSize' | 'createdAt' | 'indexStatus';
 
 export default function DocumentPage() {
   const { startOperation, endOperation } = useOperation();
+  const { showToast } = useToast();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [tags, setTags] = useState<TagSummary[]>([]);
@@ -32,6 +38,18 @@ export default function DocumentPage() {
   const [tagFilter, setTagFilter] = useState('');
   const [favoriteFilter, setFavoriteFilter] = useState('');
   const [pinnedFilter, setPinnedFilter] = useState('');
+  const [indexFilter, setIndexFilter] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [visibleColumns, setVisibleColumns] = useState<Record<ColumnKey, boolean>>({
+    folder: true,
+    extension: true,
+    fileSize: true,
+    createdAt: true,
+    indexStatus: true
+  });
   const [folderName, setFolderName] = useState('');
   const [folderEditingId, setFolderEditingId] = useState<string | null>(null);
   const [folderEditingName, setFolderEditingName] = useState('');
@@ -44,13 +62,22 @@ export default function DocumentPage() {
   const [error, setError] = useState('');
   const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
 
-  const documentQuery = (nextFolderId = folderId) => ({
+  const documentQuery = (
+    nextFolderId = folderId,
+    overrides: Partial<{
+      extension: string;
+      keyword: string;
+      tagFilter: string;
+      favoriteFilter: string;
+      pinnedFilter: string;
+    }> = {}
+  ) => ({
     folderId: nextFolderId,
-    extension,
-    keyword,
-    tag: tagFilter,
-    favorite: favoriteFilter === '' ? undefined : favoriteFilter === 'true',
-    pinned: pinnedFilter === '' ? undefined : pinnedFilter === 'true'
+    extension: overrides.extension ?? extension,
+    keyword: overrides.keyword ?? keyword,
+    tag: overrides.tagFilter ?? tagFilter,
+    favorite: (overrides.favoriteFilter ?? favoriteFilter) === '' ? undefined : (overrides.favoriteFilter ?? favoriteFilter) === 'true',
+    pinned: (overrides.pinnedFilter ?? pinnedFilter) === '' ? undefined : (overrides.pinnedFilter ?? pinnedFilter) === 'true'
   });
 
   const loadFolders = async () => {
@@ -66,9 +93,19 @@ export default function DocumentPage() {
     setDuplicates(duplicateResponse.items);
   };
 
-  const loadDocuments = async (nextFolderId = folderId) => {
-    const response = await api.documents(documentQuery(nextFolderId));
+  const loadDocuments = async (
+    nextFolderId = folderId,
+    overrides: Partial<{
+      extension: string;
+      keyword: string;
+      tagFilter: string;
+      favoriteFilter: string;
+      pinnedFilter: string;
+    }> = {}
+  ) => {
+    const response = await api.documents(documentQuery(nextFolderId, overrides));
     setDocuments(response.documents);
+    setPage(1);
     setSelectedIds((current) => current.filter((id) => response.documents.some((document) => document.documentId === id)));
   };
 
@@ -84,6 +121,7 @@ export default function DocumentPage() {
       setFolders(folderResponse.folders);
       setMoveTargetId((current) => current || folderResponse.folders[0]?.folderId || '');
       setDocuments(documentResponse.documents);
+      setPage(1);
       setTags(tagResponse.items);
       setDuplicates(duplicateResponse.items);
       setSelectedIds((current) => current.filter((id) => documentResponse.documents.some((document) => document.documentId === id)));
@@ -96,12 +134,46 @@ export default function DocumentPage() {
     void load();
   }, []);
 
+  useEffect(() => {
+    if (!message) return;
+    showToast({ type: 'success', title: message });
+  }, [message, showToast]);
+
+  useEffect(() => {
+    if (!error) return;
+    showToast({ type: 'error', title: '오류', message: error, durationMs: 6500 });
+  }, [error, showToast]);
+
   const selectedDocuments = useMemo(
     () => documents.filter((document) => selectedIds.includes(document.documentId)),
     [documents, selectedIds]
   );
 
-  const allVisibleSelected = documents.length > 0 && selectedIds.length === documents.length;
+  const sortedDocuments = useMemo(() => {
+    const filtered = indexFilter ? documents.filter((document) => document.indexStatus === indexFilter) : documents;
+    return [...filtered].sort((a, b) => {
+      const left = sortValue(a, sortKey);
+      const right = sortValue(b, sortKey);
+      const direction = sortOrder === 'asc' ? 1 : -1;
+      if (left < right) return -1 * direction;
+      if (left > right) return 1 * direction;
+      return 0;
+    });
+  }, [documents, indexFilter, sortKey, sortOrder]);
+
+  const pagedDocuments = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return sortedDocuments.slice(start, start + pageSize);
+  }, [page, pageSize, sortedDocuments]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(sortedDocuments.length / pageSize));
+    if (page > maxPage) setPage(maxPage);
+  }, [page, pageSize, sortedDocuments.length]);
+
+  const pageDocumentIds = pagedDocuments.map((document) => document.documentId);
+  const allVisibleSelected = pageDocumentIds.length > 0 && pageDocumentIds.every((id) => selectedIds.includes(id));
+  const emptyColSpan = 3 + Object.values(visibleColumns).filter(Boolean).length;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -126,7 +198,31 @@ export default function DocumentPage() {
   };
 
   const toggleAllVisible = () => {
-    setSelectedIds(allVisibleSelected ? [] : documents.map((document) => document.documentId));
+    setSelectedIds((current) => {
+      if (allVisibleSelected) return current.filter((id) => !pageDocumentIds.includes(id));
+      return Array.from(new Set([...current, ...pageDocumentIds]));
+    });
+  };
+
+  const toggleSort = (key: SortKey) => {
+    setSortKey((current) => {
+      if (current === key) {
+        setSortOrder((order) => (order === 'asc' ? 'desc' : 'asc'));
+        return current;
+      }
+      setSortOrder(key === 'createdAt' ? 'desc' : 'asc');
+      return key;
+    });
+    setPage(1);
+  };
+
+  const updateColumn = (key: ColumnKey) => {
+    setVisibleColumns((current) => ({ ...current, [key]: !current[key] }));
+  };
+
+  const quickExtension = async (nextExtension: string) => {
+    setExtension(nextExtension);
+    await loadDocuments(folderId, { extension: nextExtension });
   };
 
   const createFolder = async (event: FormEvent) => {
@@ -517,7 +613,69 @@ export default function DocumentPage() {
           <section className="panel">
             <div className="section-header">
               <h2>{selectedFolder ? `${selectedFolder.folderName} 문서` : '전체 문서'}</h2>
-              <span>{documents.length.toLocaleString()}개</span>
+              <span>
+                {sortedDocuments.length.toLocaleString()} / {documents.length.toLocaleString()}개
+              </span>
+            </div>
+            <div className="list-tools">
+              <div className="quick-filter-row">
+                <button
+                  type="button"
+                  className={!extension && !indexFilter ? 'active' : ''}
+                  onClick={() => {
+                    setIndexFilter('');
+                    void quickExtension('');
+                  }}
+                >
+                  전체
+                </button>
+                {['pdf', 'md', 'txt'].map((item) => (
+                  <button
+                    type="button"
+                    className={extension === item ? 'active' : ''}
+                    key={item}
+                    onClick={() => void quickExtension(item)}
+                  >
+                    {item.toUpperCase()}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  className={indexFilter === 'INDEXED' ? 'active' : ''}
+                  onClick={() => {
+                    setIndexFilter(indexFilter === 'INDEXED' ? '' : 'INDEXED');
+                    setPage(1);
+                  }}
+                >
+                  검색 가능
+                </button>
+                <button
+                  type="button"
+                  className={indexFilter === 'UNSEARCHABLE' ? 'active' : ''}
+                  onClick={() => {
+                    setIndexFilter(indexFilter === 'UNSEARCHABLE' ? '' : 'UNSEARCHABLE');
+                    setPage(1);
+                  }}
+                >
+                  검색 불가
+                </button>
+              </div>
+              <div className="column-toggle-row">
+                {(
+                  [
+                    ['folder', '폴더'],
+                    ['extension', '유형'],
+                    ['fileSize', '크기'],
+                    ['createdAt', '등록일'],
+                    ['indexStatus', '상태']
+                  ] as Array<[ColumnKey, string]>
+                ).map(([key, label]) => (
+                  <label key={key}>
+                    <input type="checkbox" checked={visibleColumns[key]} onChange={() => updateColumn(key)} />
+                    {label}
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="table-wrap">
               <table>
@@ -526,17 +684,39 @@ export default function DocumentPage() {
                     <th className="checkbox-cell">
                       <input type="checkbox" checked={allVisibleSelected} onChange={toggleAllVisible} />
                     </th>
-                    <th>문서명</th>
-                    <th>폴더</th>
-                    <th>유형</th>
-                    <th>크기</th>
-                    <th>등록일</th>
-                    <th>상태</th>
+                    <th>
+                      <SortButton label="문서명" sortKey="displayName" activeKey={sortKey} order={sortOrder} onClick={toggleSort} />
+                    </th>
+                    {visibleColumns.folder && (
+                      <th>
+                        <SortButton label="폴더" sortKey="folderName" activeKey={sortKey} order={sortOrder} onClick={toggleSort} />
+                      </th>
+                    )}
+                    {visibleColumns.extension && (
+                      <th>
+                        <SortButton label="유형" sortKey="extension" activeKey={sortKey} order={sortOrder} onClick={toggleSort} />
+                      </th>
+                    )}
+                    {visibleColumns.fileSize && (
+                      <th>
+                        <SortButton label="크기" sortKey="fileSize" activeKey={sortKey} order={sortOrder} onClick={toggleSort} />
+                      </th>
+                    )}
+                    {visibleColumns.createdAt && (
+                      <th>
+                        <SortButton label="등록일" sortKey="createdAt" activeKey={sortKey} order={sortOrder} onClick={toggleSort} />
+                      </th>
+                    )}
+                    {visibleColumns.indexStatus && (
+                      <th>
+                        <SortButton label="상태" sortKey="indexStatus" activeKey={sortKey} order={sortOrder} onClick={toggleSort} />
+                      </th>
+                    )}
                     <th>작업</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {documents.map((document) => (
+                  {pagedDocuments.map((document) => (
                     <tr key={document.documentId}>
                       <td className="checkbox-cell">
                         <input
@@ -578,13 +758,15 @@ export default function DocumentPage() {
                           </div>
                         )}
                       </td>
-                      <td>{document.folderName}</td>
-                      <td className="uppercase">{document.extension}</td>
-                      <td>{formatBytes(document.fileSize)}</td>
-                      <td>{formatDate(document.createdAt)}</td>
-                      <td>
-                        <StatusPill status={document.indexStatus} />
-                      </td>
+                      {visibleColumns.folder && <td>{document.folderName}</td>}
+                      {visibleColumns.extension && <td className="uppercase">{document.extension}</td>}
+                      {visibleColumns.fileSize && <td>{formatBytes(document.fileSize)}</td>}
+                      {visibleColumns.createdAt && <td>{formatDate(document.createdAt)}</td>}
+                      {visibleColumns.indexStatus && (
+                        <td>
+                          <StatusPill status={document.indexStatus} />
+                        </td>
+                      )}
                       <td>
                         <div className="row-actions">
                           <button className="icon-button" onClick={() => setViewerTarget({ documentId: document.documentId })} title="열기">
@@ -624,9 +806,9 @@ export default function DocumentPage() {
                       </td>
                     </tr>
                   ))}
-                  {documents.length === 0 && (
+                  {pagedDocuments.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="empty">
+                      <td colSpan={emptyColSpan} className="empty">
                         조회된 문서가 없습니다.
                       </td>
                     </tr>
@@ -634,6 +816,16 @@ export default function DocumentPage() {
                 </tbody>
               </table>
             </div>
+            <Pagination
+              page={page}
+              pageSize={pageSize}
+              total={sortedDocuments.length}
+              onPageChange={setPage}
+              onPageSizeChange={(nextSize) => {
+                setPageSize(nextSize);
+                setPage(1);
+              }}
+            />
           </section>
 
           <section className="panel">
@@ -683,6 +875,33 @@ function parseTags(value: string) {
       seen.add(key);
       return true;
     });
+}
+
+function SortButton({
+  label,
+  sortKey,
+  activeKey,
+  order,
+  onClick
+}: {
+  label: string;
+  sortKey: SortKey;
+  activeKey: SortKey;
+  order: 'asc' | 'desc';
+  onClick: (key: SortKey) => void;
+}) {
+  const active = sortKey === activeKey;
+  return (
+    <button className="sortable-header" type="button" onClick={() => onClick(sortKey)}>
+      {label}
+      <span>{active ? (order === 'asc' ? '▲' : '▼') : '↕'}</span>
+    </button>
+  );
+}
+
+function sortValue(document: DocumentItem, key: SortKey): string | number {
+  if (key === 'fileSize') return document.fileSize;
+  return String(document[key] || '').toLowerCase();
 }
 
 function formatBytes(value: number) {

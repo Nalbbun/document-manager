@@ -6,7 +6,7 @@
 
 ## 1. 적용 범위
 
-v1.1 개발 순서 제안 기준으로 1단계부터 6단계까지 구현되었습니다.
+v1.1 개발 순서 제안 기준으로 1단계부터 7단계까지 구현되었습니다.
 
 ```text
 1단계. 데이터 구조 확장
@@ -15,6 +15,7 @@ v1.1 개발 순서 제안 기준으로 1단계부터 6단계까지 구현되었�
 4단계. 데이터 보호 기능 구현
 5단계. 운영 안정화 기능 구현
 6단계. 검색/분류 편의 기능 구현
+7단계. UI/UX 개선
 ```
 
 ## 2. 데이터 구조 확장
@@ -84,12 +85,6 @@ data/logs/
 data/trash/
 ```
 
-백업 파일명 규칙:
-
-```text
-document-manager-backup-YYYYMMDD-HHMMSS.zip
-```
-
 ## 6. 운영 안정화 기능
 
 인덱스 관리 화면에서 데이터 무결성 점검과 자동 복구를 수행할 수 있습니다.
@@ -115,8 +110,6 @@ document-manager-backup-YYYYMMDD-HHMMSS.zip
 
 ## 7. 검색/분류 편의 기능
 
-6단계 기능이 구현되었습니다.
-
 ### 해시 기반 중복 검사
 
 - 업로드/폴더 가져오기 시 파일 내용을 SHA-256으로 계산합니다.
@@ -124,26 +117,17 @@ document-manager-backup-YYYYMMDD-HHMMSS.zip
 - 기존 문서 중 `fileHash`가 비어 있으면 중복 조회/인덱스 재생성/무결성 복구 과정에서 보정됩니다.
 - 문서/폴더 화면에서 현재 중복 파일 그룹을 확인할 수 있습니다.
 
-### 태그
+### 태그/즐겨찾기/고정/메모
 
 - 문서별 태그 저장
 - 문서별 태그/메모 편집
 - 선택 문서 태그 일괄 추가
-- 태그 목록 집계
-- 문서 목록 태그 필터
-- 검색 조건 태그 필터
-
-### 즐겨찾기/고정
-
 - 문서별 즐겨찾기 토글
 - 문서별 고정 토글
-- 문서 목록 즐겨찾기/고정 필터
-- 검색 조건 즐겨찾기/고정 필터
-- 대시보드 즐겨찾기 문서 목록 표시
+- 대시보드 즐겨찾기/고정 문서 목록 표시
+- 태그/즐겨찾기/고정 기반 문서 필터
 
 ### 검색 조건 확장
-
-검색 화면에 다음 조건이 추가되었습니다.
 
 - 일반 포함 검색
 - AND 검색
@@ -155,15 +139,38 @@ document-manager-backup-YYYYMMDD-HHMMSS.zip
 - 고정 필터
 - 관련도순, 최신순, 문서명순 정렬
 - 문서명, 폴더명, 태그, 메모 검색 포함
+- 검색 이력 저장, 재실행, 삭제
 
-### 검색 이력
+## 8. UI/UX 개선
 
-- 검색 조건과 결과 수를 `search-history.json`에 저장
-- 최근 검색 목록 조회
-- 최근 검색 조건 재실행
-- 검색 이력 삭제
+7단계 UI/UX 개선이 반영되었습니다.
 
-## 8. 메뉴 구조
+### 문서 목록
+
+- 문서명, 폴더, 유형, 크기, 등록일, 상태 기준 정렬
+- PDF/MD/TXT 빠른 필터
+- 검색 가능/검색 불가 빠른 필터
+- 페이지 크기 선택: 20개, 50개, 100개
+- 현재 페이지 기준 이전/다음 이동
+- 현재 페이지 기준 전체 선택
+- 폴더, 유형, 크기, 등록일, 상태 컬럼 표시/숨김
+
+### 검색 결과
+
+- 검색 결과 페이지네이션
+- 페이지 크기 선택: 20개, 50개, 100개
+- 검색 완료 결과 Toast 알림
+- 검색 결과 0건일 때 경고 Toast 알림
+
+### 처리 결과 알림
+
+- 공통 Toast 알림 시스템 추가
+- 성공, 경고, 오류, 정보 유형 구분
+- 상세 보기 지원
+- 업로드/폴더 가져오기 실패 목록 상세 표시
+- 문서/폴더, 검색, 인덱스, 휴지통, 백업/복원, 설정 화면 처리 결과 알림
+
+## 9. 메뉴 구조
 
 현재 메뉴 구조:
 
@@ -179,7 +186,7 @@ document-manager-backup-YYYYMMDD-HHMMSS.zip
 로그
 ```
 
-## 9. 주요 API
+## 10. 주요 API
 
 ### Documents
 
@@ -209,30 +216,22 @@ GET    /api/search/history
 DELETE /api/search/history
 ```
 
-### Trash
+### Trash / Backups / Maintenance
 
 ```text
 GET    /api/trash
 POST   /api/trash/{trash_id}/restore
 DELETE /api/trash/{trash_id}
 DELETE /api/trash
-```
 
-### Backups
+GET    /api/backups
+POST   /api/backups
+GET    /api/backups/{backup_id}/download
+POST   /api/backups/{backup_id}/validate
+POST   /api/backups/{backup_id}/restore
 
-```text
-GET  /api/backups
-POST /api/backups
-GET  /api/backups/{backup_id}/download
-POST /api/backups/{backup_id}/validate
-POST /api/backups/{backup_id}/restore
-```
-
-### Maintenance
-
-```text
-GET  /api/maintenance/integrity
-POST /api/maintenance/repair
+GET    /api/maintenance/integrity
+POST   /api/maintenance/repair
 ```
 
 ### Index / Config / Logs
@@ -246,24 +245,15 @@ PUT  /api/config
 GET  /api/logs/{type}
 ```
 
-## 10. 검증 결과
+## 11. 검증 결과
 
-6단계 적용 후 다음 검증을 완료했습니다.
+7단계 적용 후 다음 검증을 완료했습니다.
 
-- Backend `compileall` 성공
 - Frontend `pnpm build` 성공
-- `/health` 정상 응답
-- `/api/documents/tags` 정상 응답
-- `/api/documents/duplicates` 정상 응답
-- `/api/search?keyword=test&matchMode=and&sort=relevance` 정상 응답
-- `/api/search/history` 저장/조회/삭제 정상 응답
-- Frontend `http://127.0.0.1:5173` 정상 응답
+- 문서 목록 정렬/필터/페이지네이션 TypeScript 빌드 검증
+- 검색 결과 페이지네이션 TypeScript 빌드 검증
+- ToastProvider/ToastContext TypeScript 빌드 검증
 
-## 11. 남은 v1.1 후속 단계
+## 12. v1.1 상태
 
-남은 주요 단계는 7단계 UI/UX 개선입니다.
-
-- 목록 정렬/필터 고도화
-- 페이지네이션
-- Toast 알림
-- 처리 결과 알림 상세화
+문서의 v1.1 개발 순서 제안 기준 1단계부터 7단계까지 모두 적용되었습니다.

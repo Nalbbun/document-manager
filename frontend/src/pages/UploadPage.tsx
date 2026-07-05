@@ -2,10 +2,12 @@ import { FolderInput, UploadCloud } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useOperation } from '../contexts/OperationContext';
+import { useToast } from '../contexts/ToastContext';
 import type { Folder, UploadResult } from '../types/models';
 
 export default function UploadPage() {
   const { startOperation, endOperation } = useOperation();
+  const { showToast } = useToast();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [folderId, setFolderId] = useState('');
   const [files, setFiles] = useState<FileList | null>(null);
@@ -25,8 +27,11 @@ export default function UploadPage() {
         setFolders(response.folders);
         setFolderId(response.folders[0]?.folderId || '');
       })
-      .catch((err) => setError(err.message));
-  }, []);
+      .catch((err) => {
+        setError(err.message);
+        showToast({ type: 'error', title: '폴더 목록 조회 실패', message: err.message, durationMs: 6500 });
+      });
+  }, [showToast]);
 
   const upload = async (event: FormEvent) => {
     event.preventDefault();
@@ -37,9 +42,13 @@ export default function UploadPage() {
       setUploadProgress(0);
       setUploadBusy(true);
       startOperation('파일 업로드 및 인덱싱 중');
-      setResult(await api.upload(folderId, files, setUploadProgress));
+      const response = await api.upload(folderId, files, setUploadProgress);
+      setResult(response);
+      showResultToast('파일 등록 완료', response, showToast);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '파일 등록 실패');
+      const message = err instanceof Error ? err.message : '파일 등록 실패';
+      setError(message);
+      showToast({ type: 'error', title: '파일 등록 실패', message, durationMs: 6500 });
     } finally {
       setUploadBusy(false);
       endOperation();
@@ -53,9 +62,13 @@ export default function UploadPage() {
       setResult(null);
       setImportBusy(true);
       startOperation('폴더 파일 등록 및 인덱싱 중');
-      setResult(await api.importFolder(folderId, sourcePath, recursive));
+      const response = await api.importFolder(folderId, sourcePath, recursive);
+      setResult(response);
+      showResultToast('폴더 등록 완료', response, showToast);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '폴더 가져오기 실패');
+      const message = err instanceof Error ? err.message : '폴더 가져오기 실패';
+      setError(message);
+      showToast({ type: 'error', title: '폴더 가져오기 실패', message, durationMs: 6500 });
     } finally {
       setImportBusy(false);
       endOperation();
@@ -161,6 +174,16 @@ export default function UploadPage() {
       )}
     </section>
   );
+}
+
+function showResultToast(title: string, result: UploadResult, showToast: ReturnType<typeof useToast>['showToast']) {
+  showToast({
+    type: result.failCount > 0 ? 'warning' : 'success',
+    title,
+    message: `성공 ${result.successCount.toLocaleString()}건, 실패 ${result.failCount.toLocaleString()}건`,
+    details: result.failed.length > 0 ? result.failed.map((item) => `${item.fileName}: ${item.reason}`).join('\n') : undefined,
+    durationMs: result.failCount > 0 ? 9000 : 4200
+  });
 }
 
 function ProgressBar({ label, value = 0, indeterminate = false }: { label: string; value?: number; indeterminate?: boolean }) {

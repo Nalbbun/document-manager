@@ -3,11 +3,14 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { DocumentViewerModal, type ViewerTarget } from '../components/DocumentViewerModal';
 import { HighlightedText } from '../components/HighlightedText';
+import { Pagination } from '../components/Pagination';
+import { useToast } from '../contexts/ToastContext';
 import type { DocumentItem, Folder, SearchHistoryItem, SearchResult, TagSummary } from '../types/models';
 
 type SearchParams = Record<string, string | boolean | undefined | null>;
 
 export default function SearchPage() {
+  const { showToast } = useToast();
   const [folders, setFolders] = useState<Folder[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [tags, setTags] = useState<TagSummary[]>([]);
@@ -28,6 +31,8 @@ export default function SearchPage() {
   const [resultKeyword, setResultKeyword] = useState('');
   const [resultCount, setResultCount] = useState(0);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [error, setError] = useState('');
   const [viewerTarget, setViewerTarget] = useState<ViewerTarget | null>(null);
 
@@ -47,6 +52,11 @@ export default function SearchPage() {
   useEffect(() => {
     loadBaseData().catch((err) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    if (!error) return;
+    showToast({ type: 'error', title: '오류', message: error, durationMs: 6500 });
+  }, [error, showToast]);
 
   const filteredDocuments = useMemo(() => {
     if (scope !== 'document' || !folderId) return documents;
@@ -74,9 +84,25 @@ export default function SearchPage() {
     setResults(response.results);
     setResultCount(response.resultCount);
     setResultKeyword(String(params.keyword || ''));
+    setPage(1);
+    showToast({
+      type: response.resultCount > 0 ? 'success' : 'warning',
+      title: '검색 완료',
+      message: `${response.keyword} · ${response.resultCount.toLocaleString()}건`
+    });
     const historyResponse = await api.searchHistory();
     setHistory(historyResponse.items);
   };
+
+  const pagedResults = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return results.slice(start, start + pageSize);
+  }, [page, pageSize, results]);
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(results.length / pageSize));
+    if (page > maxPage) setPage(maxPage);
+  }, [page, pageSize, results.length]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -144,6 +170,7 @@ export default function SearchPage() {
       setError('');
       await api.clearSearchHistory();
       setHistory([]);
+      showToast({ type: 'success', title: '검색 이력 삭제 완료' });
     } catch (err) {
       setError(err instanceof Error ? err.message : '검색 이력을 삭제하지 못했습니다.');
     }
@@ -298,7 +325,7 @@ export default function SearchPage() {
                 </tr>
               </thead>
               <tbody>
-                {results.map((result, index) => (
+                {pagedResults.map((result, index) => (
                   <tr key={`${result.documentId}-${result.pageNumber}-${result.lineNumber}-${result.locationType}-${index}`}>
                     <td>
                       <div className="result-title">
@@ -341,7 +368,7 @@ export default function SearchPage() {
                     </td>
                   </tr>
                 ))}
-                {results.length === 0 && (
+                {pagedResults.length === 0 && (
                   <tr>
                     <td colSpan={6} className="empty">
                       검색 결과가 없습니다.
@@ -351,6 +378,16 @@ export default function SearchPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            page={page}
+            pageSize={pageSize}
+            total={results.length}
+            onPageChange={setPage}
+            onPageSizeChange={(nextSize) => {
+              setPageSize(nextSize);
+              setPage(1);
+            }}
+          />
         </section>
       </div>
       <DocumentViewerModal target={viewerTarget} onClose={() => setViewerTarget(null)} />

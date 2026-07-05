@@ -1,9 +1,11 @@
 import { Save } from 'lucide-react';
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { useToast } from '../contexts/ToastContext';
 import type { AppConfig } from '../types/models';
 
 export default function SettingsPage() {
+  const { showToast } = useToast();
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [extensions, setExtensions] = useState('');
   const [message, setMessage] = useState('');
@@ -16,8 +18,20 @@ export default function SettingsPage() {
         setConfig(response);
         setExtensions(response.allowedExtensions.join(','));
       })
-      .catch((err) => setError(err.message));
-  }, []);
+      .catch((err) => {
+        setError(err.message);
+      });
+  }, [showToast]);
+
+  useEffect(() => {
+    if (!message) return;
+    showToast({ type: 'success', title: message });
+  }, [message, showToast]);
+
+  useEffect(() => {
+    if (!error) return;
+    showToast({ type: 'error', title: '오류', message: error, durationMs: 6500 });
+  }, [error, showToast]);
 
   const save = async (event: FormEvent) => {
     event.preventDefault();

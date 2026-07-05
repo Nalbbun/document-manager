@@ -3,10 +3,12 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { StatusPill } from '../components/StatusPill';
 import { useOperation } from '../contexts/OperationContext';
+import { useToast } from '../contexts/ToastContext';
 import type { DocumentItem, IndexStatus, IntegrityReport } from '../types/models';
 
 export default function IndexPage() {
   const { startOperation, endOperation } = useOperation();
+  const { showToast } = useToast();
   const [status, setStatus] = useState<IndexStatus | null>(null);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState('');
@@ -31,6 +33,16 @@ export default function IndexPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!message) return;
+    showToast({ type: 'success', title: message });
+  }, [message, showToast]);
+
+  useEffect(() => {
+    if (!error) return;
+    showToast({ type: 'error', title: '오류', message: error, durationMs: 6500 });
+  }, [error, showToast]);
 
   const rebuild = async () => {
     if (!window.confirm('전체 검색 인덱스를 재생성할까요?')) return;
