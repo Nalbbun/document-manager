@@ -31,6 +31,16 @@ def validate_backup(backup_id: str) -> dict:
     return {"success": validation["valid"], "message": "백업 검증이 완료되었습니다.", "validation": validation}
 
 
+@router.get("/{backup_id}/preview")
+def preview_backup(backup_id: str) -> dict:
+    return {"success": True, **backup_service.preview_backup(backup_id)}
+
+
+@router.post("/{backup_id}/restore/dry-run")
+def dry_run_restore_backup(backup_id: str) -> dict:
+    return {"success": True, **backup_service.dry_run_restore(backup_id)}
+
+
 @router.post("/{backup_id}/restore")
 def restore_backup(backup_id: str) -> dict:
     result = backup_service.restore_backup(backup_id)

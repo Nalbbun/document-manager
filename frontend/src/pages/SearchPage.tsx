@@ -1,4 +1,4 @@
-import { Clock, Eye, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { Clock, Download, Eye, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { DocumentViewerModal, type ViewerTarget } from '../components/DocumentViewerModal';
@@ -310,7 +310,32 @@ export default function SearchPage() {
         <section className="panel search-result-panel">
           <div className="section-header">
             <h2>검색 결과</h2>
-            <span>{resultCount.toLocaleString()}건</span>
+            <div className="section-actions">
+              <span>{resultCount.toLocaleString()}건</span>
+              <a
+                className="icon-button"
+                aria-disabled={!resultCount}
+                href={resultCount ? api.searchExportUrl(buildParams(), 'csv') : undefined}
+                onClick={(event) => {
+                  if (!resultCount) event.preventDefault();
+                }}
+                title="CSV export"
+              >
+                <Download size={16} />
+              </a>
+              <a
+                className="icon-text-button"
+                aria-disabled={!resultCount}
+                href={resultCount ? api.searchExportUrl(buildParams(), 'markdown') : undefined}
+                onClick={(event) => {
+                  if (!resultCount) event.preventDefault();
+                }}
+                title="Markdown export"
+              >
+                <Download size={16} />
+                MD
+              </a>
+            </div>
           </div>
           <div className="table-wrap">
             <table>

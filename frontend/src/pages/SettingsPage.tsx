@@ -18,19 +18,15 @@ export default function SettingsPage() {
         setConfig(response);
         setExtensions(response.allowedExtensions.join(','));
       })
-      .catch((err) => {
-        setError(err.message);
-      });
-  }, [showToast]);
+      .catch((err) => setError(err.message));
+  }, []);
 
   useEffect(() => {
-    if (!message) return;
-    showToast({ type: 'success', title: message });
+    if (message) showToast({ type: 'success', title: message });
   }, [message, showToast]);
 
   useEffect(() => {
-    if (!error) return;
-    showToast({ type: 'error', title: '오류', message: error, durationMs: 6500 });
+    if (error) showToast({ type: 'error', title: 'Error', message: error, durationMs: 6500 });
   }, [error, showToast]);
 
   const save = async (event: FormEvent) => {
@@ -47,9 +43,9 @@ export default function SettingsPage() {
       });
       setConfig(response.config);
       setExtensions(response.config.allowedExtensions.join(','));
-      setMessage('설정이 저장되었습니다.');
+      setMessage('Settings saved.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '설정 저장 실패');
+      setError(err instanceof Error ? err.message : 'Failed to save settings.');
     }
   };
 
@@ -58,11 +54,11 @@ export default function SettingsPage() {
       <section className="page">
         <div className="page-header">
           <div>
-            <h1>환경 설정</h1>
-            <p>저장 경로와 등록 정책</p>
+            <h1>Settings</h1>
+            <p>Storage, import, retention, and operation policy</p>
           </div>
         </div>
-        {error ? <div className="alert error">{error}</div> : <div className="empty panel">설정을 불러오는 중입니다.</div>}
+        {error ? <div className="alert error">{error}</div> : <div className="empty panel">Loading settings.</div>}
       </section>
     );
   }
@@ -71,8 +67,8 @@ export default function SettingsPage() {
     <section className="page">
       <div className="page-header">
         <div>
-          <h1>환경 설정</h1>
-          <p>저장 경로와 등록 정책</p>
+          <h1>Settings</h1>
+          <p>Storage, import, retention, and operation policy</p>
         </div>
       </div>
 
@@ -81,31 +77,35 @@ export default function SettingsPage() {
 
       <form className="panel settings-form" onSubmit={save}>
         <label>
-          저장 루트
+          Storage root
           <input value={config.storageRootPath} onChange={(event) => setConfig({ ...config, storageRootPath: event.target.value })} />
         </label>
         <label>
-          인덱스 루트
+          Index root
           <input value={config.indexRootPath} onChange={(event) => setConfig({ ...config, indexRootPath: event.target.value })} />
         </label>
         <label>
-          로그 루트
+          Log root
           <input value={config.logRootPath} onChange={(event) => setConfig({ ...config, logRootPath: event.target.value })} />
         </label>
         <label>
-          휴지통 루트
+          Trash root
           <input value={config.trashRootPath} onChange={(event) => setConfig({ ...config, trashRootPath: event.target.value })} />
         </label>
         <label>
-          백업 루트
+          Backup root
           <input value={config.backupRootPath} onChange={(event) => setConfig({ ...config, backupRootPath: event.target.value })} />
         </label>
         <label>
-          허용 확장자
+          Import root
+          <input value={config.importRootPath} onChange={(event) => setConfig({ ...config, importRootPath: event.target.value })} />
+        </label>
+        <label>
+          Allowed extensions
           <input value={extensions} onChange={(event) => setExtensions(event.target.value)} />
         </label>
         <label>
-          최대 업로드 MB
+          Max upload MB
           <input
             type="number"
             min={1}
@@ -114,14 +114,87 @@ export default function SettingsPage() {
           />
         </label>
         <label>
-          기본 폴더명
+          Max import files
+          <input
+            type="number"
+            min={1}
+            value={config.maxImportFileCount}
+            onChange={(event) => setConfig({ ...config, maxImportFileCount: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          Max import total MB
+          <input
+            type="number"
+            min={1}
+            value={config.maxImportTotalSizeMB}
+            onChange={(event) => setConfig({ ...config, maxImportTotalSizeMB: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          Default folder
           <input value={config.defaultFolderName} onChange={(event) => setConfig({ ...config, defaultFolderName: event.target.value })} />
         </label>
         <label>
-          미분류 폴더명
+          Unclassified folder
           <input
             value={config.unclassifiedFolderName}
             onChange={(event) => setConfig({ ...config, unclassifiedFolderName: event.target.value })}
+          />
+        </label>
+        <label>
+          Duplicate policy
+          <select
+            value={config.duplicatePolicy}
+            onChange={(event) => setConfig({ ...config, duplicatePolicy: event.target.value as AppConfig['duplicatePolicy'] })}
+          >
+            <option value="block">Block</option>
+            <option value="auto_rename">Auto rename</option>
+          </select>
+        </label>
+        <label>
+          Backup retention count
+          <input
+            type="number"
+            min={1}
+            value={config.backupRetentionCount}
+            onChange={(event) => setConfig({ ...config, backupRetentionCount: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          Backup retention days
+          <input
+            type="number"
+            min={1}
+            value={config.backupRetentionDays}
+            onChange={(event) => setConfig({ ...config, backupRetentionDays: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          Trash retention days
+          <input
+            type="number"
+            min={1}
+            value={config.trashRetentionDays}
+            onChange={(event) => setConfig({ ...config, trashRetentionDays: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          Log retention days
+          <input
+            type="number"
+            min={1}
+            value={config.logRetentionDays}
+            onChange={(event) => setConfig({ ...config, logRetentionDays: Number(event.target.value) })}
+          />
+        </label>
+        <label>
+          Search history limit
+          <input
+            type="number"
+            min={1}
+            value={config.searchHistoryLimit}
+            onChange={(event) => setConfig({ ...config, searchHistoryLimit: Number(event.target.value) })}
           />
         </label>
         <div className="settings-toggles">
@@ -131,7 +204,7 @@ export default function SettingsPage() {
               checked={config.enableHighlight}
               onChange={(event) => setConfig({ ...config, enableHighlight: event.target.checked })}
             />
-            하이라이트
+            Highlight
           </label>
           <label className="check-row">
             <input
@@ -139,12 +212,44 @@ export default function SettingsPage() {
               checked={config.enableAuditLog}
               onChange={(event) => setConfig({ ...config, enableAuditLog: event.target.checked })}
             />
-            감사 로그
+            Audit log
+          </label>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={config.allowAbsoluteImportPath}
+              onChange={(event) => setConfig({ ...config, allowAbsoluteImportPath: event.target.checked })}
+            />
+            Absolute import path
+          </label>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={config.followSymlinks}
+              onChange={(event) => setConfig({ ...config, followSymlinks: event.target.checked })}
+            />
+            Follow symlinks
+          </label>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={config.excludeHiddenFiles}
+              onChange={(event) => setConfig({ ...config, excludeHiddenFiles: event.target.checked })}
+            />
+            Exclude hidden files
+          </label>
+          <label className="check-row">
+            <input
+              type="checkbox"
+              checked={config.autoRepairAfterIntegrityCheck}
+              onChange={(event) => setConfig({ ...config, autoRepairAfterIntegrityCheck: event.target.checked })}
+            />
+            Auto repair after integrity check
           </label>
         </div>
-        <button className="icon-text-button primary" title="설정 저장">
+        <button className="icon-text-button primary" title="Save settings">
           <Save size={17} />
-          저장
+          Save
         </button>
       </form>
     </section>

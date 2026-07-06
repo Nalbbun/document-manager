@@ -1,15 +1,17 @@
-import { Download, RefreshCcw, RotateCcw, ShieldCheck } from 'lucide-react';
+import { Download, Eye, RefreshCcw, RotateCcw, ShieldCheck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useOperation } from '../contexts/OperationContext';
 import { useToast } from '../contexts/ToastContext';
-import type { BackupItem, BackupValidation } from '../types/models';
+import type { BackupItem, BackupPreview, BackupValidation } from '../types/models';
 
 export default function BackupPage() {
   const { startOperation, endOperation } = useOperation();
   const { showToast } = useToast();
   const [items, setItems] = useState<BackupItem[]>([]);
   const [validation, setValidation] = useState<Record<string, BackupValidation>>({});
+  const [preview, setPreview] = useState<Record<string, BackupPreview>>({});
+  const [selectedPreviewId, setSelectedPreviewId] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -19,7 +21,7 @@ export default function BackupPage() {
       const response = await api.backups();
       setItems(response.items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '백업 이력을 불러오지 못했습니다.');
+      setError(err instanceof Error ? err.message : 'Failed to load backups.');
     }
   };
 
@@ -28,25 +30,23 @@ export default function BackupPage() {
   }, []);
 
   useEffect(() => {
-    if (!message) return;
-    showToast({ type: 'success', title: message, durationMs: 6500 });
+    if (message) showToast({ type: 'success', title: message, durationMs: 6500 });
   }, [message, showToast]);
 
   useEffect(() => {
-    if (!error) return;
-    showToast({ type: 'error', title: '오류', message: error, durationMs: 6500 });
+    if (error) showToast({ type: 'error', title: 'Error', message: error, durationMs: 6500 });
   }, [error, showToast]);
 
   const create = async () => {
     try {
       setError('');
       setMessage('');
-      startOperation('전체 백업 생성 중');
+      startOperation('Creating full backup');
       const response = await api.createBackup();
-      setMessage(`${response.backup.fileName} 백업이 생성되었습니다.`);
+      setMessage(`Backup created: ${response.backup.fileName}`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '백업 생성 실패');
+      setError(err instanceof Error ? err.message : 'Failed to create backup.');
     } finally {
       endOperation();
     }
@@ -58,43 +58,70 @@ export default function BackupPage() {
       setMessage('');
       const response = await api.validateBackup(item.backupId);
       setValidation((current) => ({ ...current, [item.backupId]: response.validation }));
-      setMessage(response.validation.valid ? '백업 검증이 통과되었습니다.' : '백업 검증에서 누락 항목이 발견되었습니다.');
+      setMessage(response.validation.valid ? 'Backup validation passed.' : 'Backup validation found issues.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '백업 검증 실패');
+      setError(err instanceof Error ? err.message : 'Failed to validate backup.');
+    }
+  };
+
+  const loadPreview = async (item: BackupItem) => {
+    try {
+      setError('');
+      const response = await api.previewBackup(item.backupId);
+      const nextPreview = { backup: response.backup, validation: response.validation, summary: response.summary };
+      setPreview((current) => ({ ...current, [item.backupId]: nextPreview }));
+      setValidation((current) => ({ ...current, [item.backupId]: response.validation }));
+      setSelectedPreviewId(item.backupId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to preview backup.');
     }
   };
 
   const restore = async (item: BackupItem) => {
-    if (!window.confirm(`${item.fileName} 백업으로 복원할까요? 현재 데이터는 자동 백업 후 복원됩니다.`)) return;
     try {
       setError('');
       setMessage('');
-      startOperation('백업 복원 중');
+      startOperation('Checking restore dry-run');
+      const dryRun = await api.dryRunRestoreBackup(item.backupId);
+      setPreview((current) => ({
+        ...current,
+        [item.backupId]: { backup: dryRun.backup, validation: dryRun.validation, summary: dryRun.summary }
+      }));
+      setValidation((current) => ({ ...current, [item.backupId]: dryRun.validation }));
+      setSelectedPreviewId(item.backupId);
+      if (!dryRun.restorable) {
+        setError('Dry-run failed. Restore was not started.');
+        return;
+      }
+      if (!window.confirm(`Restore from ${item.fileName}? Current data will be safety-backed up first.`)) return;
+      startOperation('Restoring backup');
       const response = await api.restoreBackup(item.backupId);
-      setMessage(`복원이 완료되었습니다. 복원 전 안전 백업: ${response.safetyBackup.fileName}`);
+      setMessage(`Restore completed. Safety backup: ${response.safetyBackup.fileName}`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '백업 복원 실패');
+      setError(err instanceof Error ? err.message : 'Failed to restore backup.');
     } finally {
       endOperation();
     }
   };
 
+  const selectedPreview = selectedPreviewId ? preview[selectedPreviewId] : null;
+
   return (
     <section className="page">
       <div className="page-header">
         <div>
-          <h1>백업/복원</h1>
-          <p>문서, 인덱스, 설정, 로그, 휴지통 데이터를 ZIP으로 백업하고 복원합니다.</p>
+          <h1>Backup / Restore</h1>
+          <p>Backup, verify, preview, dry-run, and restore document manager data</p>
         </div>
         <div className="header-actions">
-          <button className="icon-text-button" onClick={() => void load()} title="새로고침">
+          <button className="icon-text-button" onClick={() => void load()} title="Refresh">
             <RefreshCcw size={17} />
-            새로고침
+            Refresh
           </button>
-          <button className="icon-text-button primary" onClick={create} title="전체 백업">
+          <button className="icon-text-button primary" onClick={create} title="Create backup">
             <ShieldCheck size={17} />
-            전체 백업
+            Full backup
           </button>
         </div>
       </div>
@@ -102,21 +129,52 @@ export default function BackupPage() {
       {message && <div className="alert success">{message}</div>}
       {error && <div className="alert error">{error}</div>}
 
+      {selectedPreview && (
+        <section className="panel backup-preview">
+          <div className="section-header">
+            <h2>Backup preview</h2>
+            <span>{selectedPreview.validation.valid ? 'Restorable' : 'Needs attention'}</span>
+          </div>
+          <div className="stat-grid backup-stat-grid">
+            <div className="stat-card">
+              <span>Documents</span>
+              <strong>{selectedPreview.summary.documentCount.toLocaleString()}</strong>
+            </div>
+            <div className="stat-card">
+              <span>Folders</span>
+              <strong>{selectedPreview.summary.folderCount.toLocaleString()}</strong>
+            </div>
+            <div className="stat-card">
+              <span>Search index</span>
+              <strong>{selectedPreview.summary.searchIndexCount.toLocaleString()}</strong>
+            </div>
+            <div className="stat-card">
+              <span>Trash</span>
+              <strong>{selectedPreview.summary.trashCount.toLocaleString()}</strong>
+            </div>
+          </div>
+          <div className="backup-hash">
+            <strong>SHA-256</strong>
+            <span>{selectedPreview.validation.sha256 || '-'}</span>
+          </div>
+        </section>
+      )}
+
       <section className="panel">
         <div className="section-header">
-          <h2>백업 이력</h2>
-          <span>{items.length.toLocaleString()}개</span>
+          <h2>Backup history</h2>
+          <span>{items.length.toLocaleString()} items</span>
         </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>파일명</th>
-                <th>크기</th>
-                <th>생성일</th>
-                <th>상태</th>
-                <th>검증</th>
-                <th>작업</th>
+                <th>File</th>
+                <th>Size</th>
+                <th>Created</th>
+                <th>Status</th>
+                <th>Validation</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -131,19 +189,22 @@ export default function BackupPage() {
                     <td>
                       {result
                         ? result.valid
-                          ? `정상 (${result.entryCount}개 항목)`
-                          : `누락 ${result.missing.length}개`
+                          ? `OK (${result.entryCount} entries)`
+                          : `Missing ${result.missing.length}, hash ${result.hashMatches === false ? 'mismatch' : 'ok'}`
                         : '-'}
                     </td>
                     <td>
                       <div className="row-actions">
-                        <button className="icon-button" onClick={() => void validate(item)} title="검증">
+                        <button className="icon-button" onClick={() => void validate(item)} title="Validate">
                           <ShieldCheck size={16} />
                         </button>
-                        <a className="icon-button" href={api.backupDownloadUrl(item.backupId)} title="다운로드">
+                        <button className="icon-button" onClick={() => void loadPreview(item)} title="Preview">
+                          <Eye size={16} />
+                        </button>
+                        <a className="icon-button" href={api.backupDownloadUrl(item.backupId)} title="Download">
                           <Download size={16} />
                         </a>
-                        <button className="icon-button success" onClick={() => void restore(item)} title="복원">
+                        <button className="icon-button success" onClick={() => void restore(item)} title="Dry-run and restore">
                           <RotateCcw size={16} />
                         </button>
                       </div>
@@ -154,7 +215,7 @@ export default function BackupPage() {
               {items.length === 0 && (
                 <tr>
                   <td colSpan={6} className="empty">
-                    생성된 백업이 없습니다.
+                    No backups.
                   </td>
                 </tr>
               )}

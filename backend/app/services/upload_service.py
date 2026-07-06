@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import hashlib
+import os
 from pathlib import Path
 from typing import Any
 
@@ -94,7 +95,7 @@ async def upload_files(folder_id: str, files: list[UploadFile]) -> dict:
 def import_folder(folder_id: str, source_path: str, recursive: bool = True) -> dict:
     folder = get_folder(folder_id)
     target_folder_path = ensure_within_root(settings.project_root / folder["folderPath"], settings.storage_root)
-    source = Path(source_path).expanduser().resolve()
+    source = _resolve_import_source(source_path)
     if not source.exists() or not source.is_dir():
         raise AppError("가져올 폴더 경로를 찾을 수 없습니다.")
 
@@ -103,6 +104,8 @@ def import_folder(folder_id: str, source_path: str, recursive: bool = True) -> d
     items = read_items()
     succeeded: list[dict] = []
     failed: list[dict] = []
+    accepted_count = 0
+    total_size = 0
 
     for file_path in files:
         if not file_path.is_file():
@@ -110,14 +113,27 @@ def import_folder(folder_id: str, source_path: str, recursive: bool = True) -> d
         file_name = safe_file_name(file_path.name)
         extension = normalize_extension(file_name)
         if extension not in settings.allowed_extensions:
+            failed.append({"fileName": file_name, "reason": "Unsupported extension."})
+            continue
+        if settings.exclude_hidden_files and _has_hidden_part(file_path, source):
+            failed.append({"fileName": file_name, "reason": "Hidden file paths are excluded by configuration."})
+            continue
+        if not settings.follow_symlinks and _has_symlink_part(file_path, source):
+            failed.append({"fileName": file_name, "reason": "Symbolic links are blocked by configuration."})
             continue
         try:
             size = file_path.stat().st_size
+            if accepted_count >= settings.max_import_file_count:
+                raise AppError("Import file count limit exceeded.")
+            if total_size + size > settings.max_import_total_size_bytes:
+                raise AppError("Import total size limit exceeded.")
             if size > settings.max_upload_size_bytes:
                 raise AppError("파일 크기가 업로드 제한을 초과했습니다.")
             content = file_path.read_bytes()
             document = _register_file_content(folder, target_folder_path, file_name, content, documents, items)
             succeeded.append(document)
+            accepted_count += 1
+            total_size += size
         except AppError as exc:
             failed.append({"fileName": file_name, "reason": exc.message})
         except Exception as exc:
@@ -132,9 +148,74 @@ def import_folder(folder_id: str, source_path: str, recursive: bool = True) -> d
         folder["folderName"],
         "SUCCESS" if not failed else "PARTIAL",
         "폴더 단위 등록 처리 완료",
-        {"sourcePath": str(source), "successCount": len(succeeded), "failCount": len(failed)},
+        {
+            "sourcePath": str(source),
+            "successCount": len(succeeded),
+            "failCount": len(failed),
+            "totalSize": total_size,
+        },
     )
     return {"successCount": len(succeeded), "failCount": len(failed), "succeeded": succeeded, "failed": failed}
+
+
+def _resolve_import_source(source_path: str) -> Path:
+    raw = Path(source_path).expanduser()
+    settings.import_root.mkdir(parents=True, exist_ok=True)
+    import_root = settings.import_root.resolve()
+    if raw.is_absolute():
+        source = raw.resolve()
+        if not settings.allow_absolute_import_path:
+            source = ensure_within_root(source, import_root)
+    else:
+        source = ensure_within_root(import_root / raw, import_root)
+
+    _block_system_import_path(source)
+    if not source.exists() or not source.is_dir():
+        raise AppError("Import folder path was not found.")
+    if not settings.follow_symlinks and source.is_symlink():
+        raise AppError("Import source cannot be a symbolic link.")
+    return source
+
+
+def _block_system_import_path(source: Path) -> None:
+    protected_roots = [
+        Path(os.environ.get("WINDIR", r"C:\Windows")),
+        Path(os.environ.get("ProgramFiles", r"C:\Program Files")),
+        Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")),
+    ]
+    for root in protected_roots:
+        if _is_relative_to(source, root):
+            raise AppError("System folders cannot be imported.", status_code=403)
+
+
+def _has_hidden_part(path: Path, root: Path) -> bool:
+    try:
+        parts = path.relative_to(root).parts
+    except ValueError:
+        parts = path.parts
+    return any(part.startswith(".") for part in parts)
+
+
+def _has_symlink_part(path: Path, root: Path) -> bool:
+    try:
+        relative_parts = path.relative_to(root).parts
+        current = root
+    except ValueError:
+        relative_parts = path.parts
+        current = Path(path.anchor)
+    for part in relative_parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
+def _is_relative_to(path: Path, root: Path) -> bool:
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def _register_file_content(

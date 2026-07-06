@@ -944,6 +944,14 @@ label {
   font-weight: 800;
 }
 
+.section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .snippet {
   max-width: 520px;
   line-height: 1.5;
@@ -1265,6 +1273,40 @@ mark {
   line-height: 1.55;
 }
 
+.log-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(140px, 180px) repeat(4, auto);
+  gap: 9px;
+  align-items: center;
+}
+
+.backup-preview {
+  display: grid;
+  gap: 14px;
+}
+
+.backup-stat-grid {
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+}
+
+.backup-hash {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.backup-hash span {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 12px;
+}
+
+.icon-text-button[aria-disabled="true"],
+.icon-button[aria-disabled="true"] {
+  pointer-events: none;
+}
+
 @media (max-width: 1120px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -1295,6 +1337,7 @@ mark {
 
   .search-panel,
   .filter-bar,
+  .log-toolbar,
   .document-filter-bar,
   .classification-filter-bar,
   .advanced-search-panel,

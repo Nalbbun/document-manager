@@ -81,7 +81,12 @@ def move_document(document_id: str, folder_id: str) -> dict:
 
     target_folder_path = ensure_within_root(settings.project_root / target_folder["folderPath"], settings.storage_root)
     target_folder_path.mkdir(parents=True, exist_ok=True)
-    target_path = ensure_within_root(target_folder_path / document["fileName"], settings.storage_root)
+    file_name = document["fileName"]
+    target_path = ensure_within_root(target_folder_path / file_name, settings.storage_root)
+    has_conflict = _duplicate_file_exists(documents, target_folder["folderId"], file_name) or target_path.exists()
+    if has_conflict and policy == "auto_rename":
+        file_name = _available_restore_file_name(file_name, target_folder_path, documents, target_folder["folderId"])
+        target_path = ensure_within_root(target_folder_path / file_name, settings.storage_root)
 
     if _duplicate_file_exists(documents, folder_id, document["fileName"], exclude_document_id=document_id) or target_path.exists():
         raise AppError("이동 대상 폴더에 같은 파일명이 이미 있습니다.")
@@ -313,16 +318,19 @@ def list_trash_items() -> list[dict]:
     return items
 
 
-def restore_trash_item(trash_id: str, folder_id: str | None = None) -> dict:
+def restore_trash_item(trash_id: str, folder_id: str | None = None, conflict_policy: str | None = None) -> dict:
     trash_items = read_trash_items()
     trash_item = _find_trash_item(trash_items, trash_id)
     document = dict(trash_item["document"])
     target_folder = _get_folder(folder_id or trash_item["originalFolderId"])
+    policy = conflict_policy or str(settings.runtime_config.get("duplicatePolicy", "block"))
+    if policy not in {"block", "auto_rename", "select_folder"}:
+        policy = "block"
 
     documents = read_documents()
     if any(item["documentId"] == document["documentId"] for item in documents):
         raise AppError("같은 문서 ID가 이미 문서 목록에 있습니다.")
-    if _duplicate_file_exists(documents, target_folder["folderId"], document["fileName"]):
+    if policy != "auto_rename" and _duplicate_file_exists(documents, target_folder["folderId"], document["fileName"]):
         raise AppError("복원 대상 폴더에 같은 파일명이 이미 있습니다.")
 
     trash_path = ensure_within_root(settings.project_root / trash_item["trashPath"], settings.trash_root)
@@ -340,6 +348,8 @@ def restore_trash_item(trash_id: str, folder_id: str | None = None) -> dict:
     timestamp = now_iso()
     document["folderId"] = target_folder["folderId"]
     document["folderName"] = target_folder["folderName"]
+    document["fileName"] = file_name
+    document["displayName"] = file_name
     document["filePath"] = relative_to_project(target_path, settings.project_root)
     document["fileSize"] = target_path.stat().st_size
     document["pageCount"] = extraction["pageCount"]
@@ -477,6 +487,21 @@ def _build_renamed_file_name(file_name: str, extension: str) -> str:
     if not stem:
         raise AppError("파일명을 입력하세요.")
     return f"{stem}.{extension}"
+
+
+def _available_restore_file_name(file_name: str, folder_path: Path, documents: list[dict], folder_id: str) -> str:
+    candidate = safe_file_name(file_name)
+    path = Path(candidate)
+    stem = path.stem or candidate
+    suffix = path.suffix
+    for index in range(1, 1000):
+        next_name = f"{stem}_restored{index if index > 1 else ''}{suffix}"
+        if _duplicate_file_exists(documents, folder_id, next_name):
+            continue
+        if (folder_path / next_name).exists():
+            continue
+        return next_name
+    raise AppError("Could not build a unique restore file name.")
 
 
 def _update_search_index_document(document: dict) -> None:

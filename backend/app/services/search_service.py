@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from urllib.parse import quote
 
+from app.core.config import settings
 from app.core.logger import now_iso, write_audit
 from app.repositories.document_repository import read_documents
 from app.repositories.search_history_repository import read_search_history_items, write_search_history_items
@@ -114,7 +115,8 @@ def search_documents(
 def list_search_history(limit: int = 30) -> list[dict]:
     items = read_search_history_items()
     items.sort(key=lambda item: item.get("searchedAt") or "", reverse=True)
-    return items[: max(1, min(limit, 100))]
+    configured_limit = int(settings.runtime_config.get("searchHistoryLimit", 100))
+    return items[: max(1, min(limit, configured_limit))]
 
 
 def clear_search_history() -> dict:
@@ -267,4 +269,5 @@ def _record_search_history(keyword: str, filters: dict, result_count: int) -> No
         for history in existing
         if not (history.get("keyword") == keyword and history.get("filters", {}) == filters)
     ]
-    write_search_history_items([item, *filtered][:50])
+    configured_limit = int(settings.runtime_config.get("searchHistoryLimit", 100))
+    write_search_history_items([item, *filtered][: max(1, configured_limit)])

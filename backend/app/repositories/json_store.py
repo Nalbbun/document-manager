@@ -39,11 +39,18 @@ class JsonStore:
 
     def _write_unlocked(self, data: dict[str, Any], create_backup: bool = True) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        backup_path = self.path.with_suffix(self.path.suffix + ".bak")
         if create_backup and self.path.exists():
-            backup_path = self.path.with_suffix(self.path.suffix + ".bak")
             backup_path.write_text(self.path.read_text(encoding="utf-8"), encoding="utf-8")
         temp_path = self.path.with_suffix(self.path.suffix + ".tmp")
         with temp_path.open("w", encoding="utf-8") as file:
             json.dump(data, file, ensure_ascii=False, indent=2)
             file.write("\n")
-        temp_path.replace(self.path)
+        with temp_path.open("r", encoding="utf-8") as file:
+            json.load(file)
+        try:
+            temp_path.replace(self.path)
+        except Exception:
+            if create_backup and backup_path.exists():
+                backup_path.replace(self.path)
+            raise

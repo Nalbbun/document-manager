@@ -51,6 +51,8 @@ class BulkDocumentTagRequest(BaseModel):
 
 class TrashRestoreRequest(BaseModel):
     folderId: str | None = None
+    targetFolderId: str | None = None
+    conflictPolicy: Literal["block", "auto_rename", "select_folder"] = "auto_rename"
 
 
 class SearchQuery(BaseModel):
@@ -75,12 +77,25 @@ class ConfigUpdate(BaseModel):
     logRootPath: str | None = None
     trashRootPath: str | None = None
     backupRootPath: str | None = None
+    importRootPath: str | None = None
     allowedExtensions: list[str] | None = None
     maxUploadSizeMB: int | None = Field(default=None, ge=1, le=2048)
+    maxImportFileCount: int | None = Field(default=None, ge=1, le=100000)
+    maxImportTotalSizeMB: int | None = Field(default=None, ge=1, le=102400)
     defaultFolderName: str | None = None
     unclassifiedFolderName: str | None = None
     enableHighlight: bool | None = None
     enableAuditLog: bool | None = None
+    allowAbsoluteImportPath: bool | None = None
+    followSymlinks: bool | None = None
+    excludeHiddenFiles: bool | None = None
+    duplicatePolicy: Literal["block", "auto_rename"] | None = None
+    backupRetentionCount: int | None = Field(default=None, ge=1, le=1000)
+    backupRetentionDays: int | None = Field(default=None, ge=1, le=3650)
+    trashRetentionDays: int | None = Field(default=None, ge=1, le=3650)
+    logRetentionDays: int | None = Field(default=None, ge=1, le=3650)
+    searchHistoryLimit: int | None = Field(default=None, ge=1, le=1000)
+    autoRepairAfterIntegrityCheck: bool | None = None
 
 
 class ApiResponse(BaseModel):

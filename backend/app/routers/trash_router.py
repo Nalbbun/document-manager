@@ -16,7 +16,9 @@ def get_trash_items() -> dict:
 
 @router.post("/{trash_id}/restore")
 def restore_trash_item(trash_id: str, payload: TrashRestoreRequest | None = None) -> dict:
-    document = document_service.restore_trash_item(trash_id, payload.folderId if payload else None)
+    folder_id = (payload.targetFolderId or payload.folderId) if payload else None
+    conflict_policy = payload.conflictPolicy if payload else None
+    document = document_service.restore_trash_item(trash_id, folder_id, conflict_policy)
     return {"success": True, "message": "문서가 복원되었습니다.", "document": document}
 
 

@@ -49,6 +49,7 @@ export type BackupItem = {
   backupId: string;
   fileName: string;
   fileSize: number;
+  sha256?: string;
   backupPath: string;
   createdAt: string;
   status: string;
@@ -60,6 +61,32 @@ export type BackupValidation = {
   entryCount: number;
   missing: string[];
   badFile: string | null;
+  sha256?: string;
+  expectedSha256?: string | null;
+  hashMatches?: boolean;
+};
+
+export type BackupPreviewSummary = {
+  totalEntries: number;
+  storageFiles: number;
+  indexFiles: number;
+  configFiles: number;
+  logFiles: number;
+  trashFiles: number;
+  documentCount: number;
+  folderCount: number;
+  searchIndexCount: number;
+  trashCount: number;
+};
+
+export type BackupPreview = {
+  backup: BackupItem;
+  validation: BackupValidation;
+  summary: BackupPreviewSummary;
+};
+
+export type BackupDryRun = BackupPreview & {
+  restorable: boolean;
 };
 
 export type TagSummary = {
@@ -160,12 +187,25 @@ export type AppConfig = {
   logRootPath: string;
   trashRootPath: string;
   backupRootPath: string;
+  importRootPath: string;
   allowedExtensions: string[];
   maxUploadSizeMB: number;
+  maxImportFileCount: number;
+  maxImportTotalSizeMB: number;
   defaultFolderName: string;
   unclassifiedFolderName: string;
   enableHighlight: boolean;
   enableAuditLog: boolean;
+  allowAbsoluteImportPath: boolean;
+  followSymlinks: boolean;
+  excludeHiddenFiles: boolean;
+  duplicatePolicy: 'block' | 'auto_rename';
+  backupRetentionCount: number;
+  backupRetentionDays: number;
+  trashRetentionDays: number;
+  logRetentionDays: number;
+  searchHistoryLimit: number;
+  autoRepairAfterIntegrityCheck: boolean;
   backendHost: string;
   backendPort: number;
   frontendPort: number;

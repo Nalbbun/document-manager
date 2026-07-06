@@ -11,12 +11,54 @@ ALLOWED_CONFIG_KEYS = {
     "logRootPath",
     "trashRootPath",
     "backupRootPath",
+    "importRootPath",
     "allowedExtensions",
     "maxUploadSizeMB",
+    "maxImportFileCount",
+    "maxImportTotalSizeMB",
     "defaultFolderName",
     "unclassifiedFolderName",
     "enableHighlight",
     "enableAuditLog",
+    "allowAbsoluteImportPath",
+    "followSymlinks",
+    "excludeHiddenFiles",
+    "duplicatePolicy",
+    "backupRetentionCount",
+    "backupRetentionDays",
+    "trashRetentionDays",
+    "logRetentionDays",
+    "searchHistoryLimit",
+    "autoRepairAfterIntegrityCheck",
+}
+
+PATH_KEYS = {
+    "storageRootPath",
+    "indexRootPath",
+    "logRootPath",
+    "trashRootPath",
+    "backupRootPath",
+    "importRootPath",
+}
+
+POSITIVE_INT_KEYS = {
+    "maxUploadSizeMB",
+    "maxImportFileCount",
+    "maxImportTotalSizeMB",
+    "backupRetentionCount",
+    "backupRetentionDays",
+    "trashRetentionDays",
+    "logRetentionDays",
+    "searchHistoryLimit",
+}
+
+BOOL_KEYS = {
+    "enableHighlight",
+    "enableAuditLog",
+    "allowAbsoluteImportPath",
+    "followSymlinks",
+    "excludeHiddenFiles",
+    "autoRepairAfterIntegrityCheck",
 }
 
 
@@ -36,6 +78,20 @@ def update_config(payload: dict) -> dict:
         updates["defaultFolderName"] = validate_folder_name(updates["defaultFolderName"])
     if "unclassifiedFolderName" in updates:
         updates["unclassifiedFolderName"] = validate_folder_name(updates["unclassifiedFolderName"])
+    for key in PATH_KEYS & updates.keys():
+        value = str(updates[key]).strip()
+        if not value:
+            raise AppError(f"{key} must not be empty.")
+        updates[key] = value
+    for key in POSITIVE_INT_KEYS & updates.keys():
+        value = int(updates[key])
+        if value < 1:
+            raise AppError(f"{key} must be greater than zero.")
+        updates[key] = value
+    for key in BOOL_KEYS & updates.keys():
+        updates[key] = bool(updates[key])
+    if updates.get("duplicatePolicy") not in (None, "block", "auto_rename"):
+        raise AppError("duplicatePolicy must be block or auto_rename.")
 
     config.update(updates)
     settings.write_runtime_config(config)

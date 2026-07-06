@@ -5,12 +5,15 @@ import { useOperation } from '../contexts/OperationContext';
 import { useToast } from '../contexts/ToastContext';
 import type { Folder, TrashItem } from '../types/models';
 
+type ConflictPolicy = 'block' | 'auto_rename' | 'select_folder';
+
 export default function TrashPage() {
   const { startOperation, endOperation } = useOperation();
   const { showToast } = useToast();
   const [items, setItems] = useState<TrashItem[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [restoreFolderId, setRestoreFolderId] = useState('');
+  const [conflictPolicy, setConflictPolicy] = useState<ConflictPolicy>('auto_rename');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
@@ -22,7 +25,7 @@ export default function TrashPage() {
       setFolders(folderResponse.folders);
       setRestoreFolderId((current) => current || folderResponse.folders[0]?.folderId || '');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '휴지통 정보를 불러오지 못했습니다.');
+      setError(err instanceof Error ? err.message : 'Failed to load trash.');
     }
   };
 
@@ -31,43 +34,41 @@ export default function TrashPage() {
   }, []);
 
   useEffect(() => {
-    if (!message) return;
-    showToast({ type: 'success', title: message });
+    if (message) showToast({ type: 'success', title: message });
   }, [message, showToast]);
 
   useEffect(() => {
-    if (!error) return;
-    showToast({ type: 'error', title: '오류', message: error, durationMs: 6500 });
+    if (error) showToast({ type: 'error', title: 'Error', message: error, durationMs: 6500 });
   }, [error, showToast]);
 
   const restore = async (item: TrashItem) => {
     const targetFolderId = restoreFolderId || undefined;
-    if (!window.confirm(`${item.fileName} 문서를 복원할까요?`)) return;
+    if (!window.confirm(`Restore ${item.fileName}?`)) return;
     try {
       setError('');
       setMessage('');
-      startOperation('문서 복원 중');
-      await api.restoreTrashItem(item.trashId, targetFolderId);
-      setMessage('문서가 복원되었습니다.');
+      startOperation('Restoring document');
+      const response = await api.restoreTrashItem(item.trashId, targetFolderId, conflictPolicy);
+      setMessage(`Restored: ${response.document.displayName}`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '문서 복원 실패');
+      setError(err instanceof Error ? err.message : 'Failed to restore document.');
     } finally {
       endOperation();
     }
   };
 
   const remove = async (item: TrashItem) => {
-    if (!window.confirm(`${item.fileName} 문서를 영구 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return;
+    if (!window.confirm(`Permanently delete ${item.fileName}? This cannot be undone.`)) return;
     try {
       setError('');
       setMessage('');
-      startOperation('문서 영구 삭제 중');
+      startOperation('Deleting document permanently');
       await api.deleteTrashItem(item.trashId);
-      setMessage('문서가 영구 삭제되었습니다.');
+      setMessage('Document permanently deleted.');
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '영구 삭제 실패');
+      setError(err instanceof Error ? err.message : 'Failed to delete document.');
     } finally {
       endOperation();
     }
@@ -75,16 +76,16 @@ export default function TrashPage() {
 
   const empty = async () => {
     if (!items.length) return;
-    if (!window.confirm(`휴지통 문서 ${items.length}건을 모두 영구 삭제할까요?`)) return;
+    if (!window.confirm(`Permanently delete ${items.length} trash items?`)) return;
     try {
       setError('');
       setMessage('');
-      startOperation('휴지통 비우는 중');
+      startOperation('Emptying trash');
       const result = await api.emptyTrash();
-      setMessage(`휴지통 비우기 완료: 성공 ${result.successCount}, 실패 ${result.failCount}`);
+      setMessage(`Trash emptied: success ${result.successCount}, failed ${result.failCount}`);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '휴지통 비우기 실패');
+      setError(err instanceof Error ? err.message : 'Failed to empty trash.');
     } finally {
       endOperation();
     }
@@ -94,17 +95,17 @@ export default function TrashPage() {
     <section className="page">
       <div className="page-header">
         <div>
-          <h1>휴지통</h1>
-          <p>삭제된 문서를 복원하거나 영구 삭제합니다.</p>
+          <h1>Trash</h1>
+          <p>Restore or permanently delete removed documents</p>
         </div>
         <div className="header-actions">
-          <button className="icon-text-button" onClick={() => void load()} title="새로고침">
+          <button className="icon-text-button" onClick={() => void load()} title="Refresh">
             <RefreshCcw size={17} />
-            새로고침
+            Refresh
           </button>
-          <button className="icon-text-button danger" disabled={!items.length} onClick={empty} title="휴지통 비우기">
+          <button className="icon-text-button danger" disabled={!items.length} onClick={empty} title="Empty trash">
             <Trash2 size={17} />
-            비우기
+            Empty
           </button>
         </div>
       </div>
@@ -114,7 +115,7 @@ export default function TrashPage() {
 
       <section className="panel trash-toolbar">
         <label>
-          복원 대상 폴더
+          Restore folder
           <select value={restoreFolderId} onChange={(event) => setRestoreFolderId(event.target.value)}>
             {folders.map((folder) => (
               <option key={folder.folderId} value={folder.folderId}>
@@ -123,22 +124,30 @@ export default function TrashPage() {
             ))}
           </select>
         </label>
+        <label>
+          Conflict policy
+          <select value={conflictPolicy} onChange={(event) => setConflictPolicy(event.target.value as ConflictPolicy)}>
+            <option value="auto_rename">Auto rename</option>
+            <option value="block">Block</option>
+            <option value="select_folder">Require selected folder</option>
+          </select>
+        </label>
       </section>
 
       <section className="panel">
         <div className="section-header">
-          <h2>삭제 문서</h2>
-          <span>{items.length.toLocaleString()}개</span>
+          <h2>Deleted documents</h2>
+          <span>{items.length.toLocaleString()} items</span>
         </div>
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>문서명</th>
-                <th>원래 폴더</th>
-                <th>삭제일</th>
-                <th>원래 경로</th>
-                <th>작업</th>
+                <th>Document</th>
+                <th>Original folder</th>
+                <th>Deleted at</th>
+                <th>Original path</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -150,10 +159,10 @@ export default function TrashPage() {
                   <td className="mono-cell">{item.originalPath}</td>
                   <td>
                     <div className="row-actions">
-                      <button className="icon-button success" onClick={() => void restore(item)} title="복원">
+                      <button className="icon-button success" onClick={() => void restore(item)} title="Restore">
                         <RotateCcw size={16} />
                       </button>
-                      <button className="icon-button danger" onClick={() => void remove(item)} title="영구 삭제">
+                      <button className="icon-button danger" onClick={() => void remove(item)} title="Delete permanently">
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -163,7 +172,7 @@ export default function TrashPage() {
               {items.length === 0 && (
                 <tr>
                   <td colSpan={5} className="empty">
-                    휴지통이 비어 있습니다.
+                    Trash is empty.
                   </td>
                 </tr>
               )}

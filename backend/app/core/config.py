@@ -17,12 +17,25 @@ class Settings:
         "logRootPath": "data/logs",
         "trashRootPath": "data/trash",
         "backupRootPath": "data/backup",
+        "importRootPath": "data/import",
         "allowedExtensions": ["pdf", "md", "txt"],
         "maxUploadSizeMB": 100,
+        "maxImportFileCount": 1000,
+        "maxImportTotalSizeMB": 2048,
         "defaultFolderName": "default",
         "unclassifiedFolderName": "unclassified",
         "enableHighlight": True,
         "enableAuditLog": True,
+        "allowAbsoluteImportPath": False,
+        "followSymlinks": False,
+        "excludeHiddenFiles": True,
+        "duplicatePolicy": "block",
+        "backupRetentionCount": 10,
+        "backupRetentionDays": 90,
+        "trashRetentionDays": 30,
+        "logRetentionDays": 30,
+        "searchHistoryLimit": 100,
+        "autoRepairAfterIntegrityCheck": False,
         "backendHost": "127.0.0.1",
         "backendPort": 8000,
         "frontendPort": 5173,
@@ -63,10 +76,20 @@ class Settings:
     def write_runtime_config(self, config: dict[str, Any]) -> None:
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
         temp_path = self.config_path.with_suffix(".json.tmp")
+        backup_path = self.config_path.with_suffix(".json.bak")
+        if self.config_path.exists():
+            backup_path.write_text(self.config_path.read_text(encoding="utf-8"), encoding="utf-8")
         with temp_path.open("w", encoding="utf-8") as file:
             json.dump(config, file, ensure_ascii=False, indent=2)
             file.write("\n")
-        temp_path.replace(self.config_path)
+        with temp_path.open("r", encoding="utf-8") as file:
+            json.load(file)
+        try:
+            temp_path.replace(self.config_path)
+        except Exception:
+            if backup_path.exists():
+                backup_path.replace(self.config_path)
+            raise
 
     @property
     def storage_root(self) -> Path:
@@ -89,8 +112,32 @@ class Settings:
         return self.resolve_project_path(self.runtime_config["backupRootPath"])
 
     @property
+    def import_root(self) -> Path:
+        return self.resolve_project_path(self.runtime_config["importRootPath"])
+
+    @property
     def max_upload_size_bytes(self) -> int:
         return int(self.runtime_config["maxUploadSizeMB"]) * 1024 * 1024
+
+    @property
+    def max_import_file_count(self) -> int:
+        return int(self.runtime_config.get("maxImportFileCount", 1000))
+
+    @property
+    def max_import_total_size_bytes(self) -> int:
+        return int(self.runtime_config.get("maxImportTotalSizeMB", 2048)) * 1024 * 1024
+
+    @property
+    def allow_absolute_import_path(self) -> bool:
+        return bool(self.runtime_config.get("allowAbsoluteImportPath", False))
+
+    @property
+    def follow_symlinks(self) -> bool:
+        return bool(self.runtime_config.get("followSymlinks", False))
+
+    @property
+    def exclude_hidden_files(self) -> bool:
+        return bool(self.runtime_config.get("excludeHiddenFiles", True))
 
     @property
     def allowed_extensions(self) -> set[str]:

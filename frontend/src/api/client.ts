@@ -1,6 +1,8 @@
 import type {
   AppConfig,
+  BackupDryRun,
   BackupItem,
+  BackupPreview,
   BackupValidation,
   DocumentItem,
   DuplicateGroup,
@@ -130,6 +132,8 @@ export const api = {
     request<{ success: boolean; keyword: string; resultCount: number; results: SearchResult[] }>(
       `/api/search${query(params)}`
     ),
+  searchExportUrl: (params: Record<string, string | boolean | undefined | null>, format: 'csv' | 'markdown') =>
+    `${API_BASE_URL}/api/search/export${query({ ...params, format })}`,
   searchHistory: (limit = 30) => request<{ items: SearchHistoryItem[] }>(`/api/search/history${query({ limit })}`),
   clearSearchHistory: () =>
     request<{ success: boolean; message: string; deletedCount: number }>('/api/search/history', { method: 'DELETE' }),
@@ -151,13 +155,26 @@ export const api = {
   config: () => request<AppConfig>('/api/config'),
   updateConfig: (payload: Partial<AppConfig>) =>
     request<{ success: boolean; message: string; config: AppConfig }>('/api/config', { method: 'PUT', body: payload }),
-  log: (type: 'app' | 'error' | 'audit', lines = 200) =>
-    request<{ type: string; lines: string[] }>(`/api/logs/${type}${query({ lines })}`),
+  log: (
+    type: 'app' | 'error' | 'audit',
+    lines = 200,
+    filters: { q?: string; level?: string; startDate?: string; endDate?: string } = {}
+  ) => request<{ type: string; lines: string[]; totalMatched: number }>(`/api/logs/${type}${query({ lines, ...filters })}`),
+  logDownloadUrl: (type: 'app' | 'error' | 'audit') => `${API_BASE_URL}/api/logs/${type}/download`,
+  archiveLog: (type: 'app' | 'error' | 'audit') =>
+    request<{ success: boolean; archive: { archivePath: string; fileSize: number; archivedAt: string } }>(
+      `/api/logs/${type}/archive`,
+      { method: 'POST' }
+    ),
+  clearLog: (type: 'app' | 'error' | 'audit') =>
+    request<{ success: boolean; log: { deletedSize: number; clearedAt: string } }>(`/api/logs/${type}`, {
+      method: 'DELETE'
+    }),
   trash: () => request<{ items: TrashItem[] }>('/api/trash'),
-  restoreTrashItem: (trashId: string, folderId?: string) =>
+  restoreTrashItem: (trashId: string, folderId?: string, conflictPolicy: 'block' | 'auto_rename' | 'select_folder' = 'auto_rename') =>
     request<{ success: boolean; message: string; document: DocumentItem }>(`/api/trash/${trashId}/restore`, {
       method: 'POST',
-      body: { folderId }
+      body: { folderId, conflictPolicy }
     }),
   deleteTrashItem: (trashId: string) =>
     request<{ success: boolean; message: string; item: TrashItem }>(`/api/trash/${trashId}`, { method: 'DELETE' }),
@@ -177,6 +194,9 @@ export const api = {
     request<{ success: boolean; message: string; validation: BackupValidation }>(`/api/backups/${backupId}/validate`, {
       method: 'POST'
     }),
+  previewBackup: (backupId: string) => request<{ success: boolean } & BackupPreview>(`/api/backups/${backupId}/preview`),
+  dryRunRestoreBackup: (backupId: string) =>
+    request<{ success: boolean } & BackupDryRun>(`/api/backups/${backupId}/restore/dry-run`, { method: 'POST' }),
   restoreBackup: (backupId: string) =>
     request<{
       success: boolean;
