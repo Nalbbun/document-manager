@@ -74,7 +74,7 @@ def update_config(payload: dict) -> dict:
         if not extensions:
             raise AppError("허용 확장자를 1개 이상 입력하세요.")
         extension_set = set(extensions)
-        if extension_set == settings.legacy_default_extensions:
+        if extension_set in (settings.legacy_default_extensions, settings.previous_default_extensions):
             extension_set.update(settings.default_config["allowedExtensions"])
         updates["allowedExtensions"] = sorted(extension_set)
     if "defaultFolderName" in updates:

@@ -3,7 +3,7 @@
   "storageRoot": "./data/storage",
   "indexRoot": "./data/index",
   "logRoot": "./logs",
-  "allowedExtensions": ["pdf", "md", "txt", "pptx"],
+  "allowedExtensions": ["pdf", "md", "txt", "pptx", "hwpx"],
   "maxFileSizeMB": 100,
   "defaultFolderName": "기본폴더",
   "backendHost": "127.0.0.1",

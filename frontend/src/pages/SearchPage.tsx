@@ -242,6 +242,7 @@ export default function SearchPage() {
           <option value="md">MD</option>
           <option value="txt">TXT</option>
           <option value="pptx">PPTX</option>
+          <option value="hwpx">HWPX</option>
         </select>
         <select value={tag} onChange={(event) => setTag(event.target.value)}>
           <option value="">전체 태그</option>
@@ -423,6 +424,12 @@ export default function SearchPage() {
 
 function formatLocation(result: SearchResult) {
   if (result.locationType === 'META') return '문서 정보';
+  if (result.locationType === 'SLIDE') return result.pageNumber ? `${result.pageNumber}슬라이드` : '-';
+  if (result.locationType === 'SECTION') {
+    const section = result.pageNumber ? `${result.pageNumber}섹션` : '';
+    const paragraph = result.lineNumber ? `${result.lineNumber}문단` : '';
+    return [section, paragraph].filter(Boolean).join(' / ') || '-';
+  }
   if (result.pageNumber) return `${result.pageNumber}페이지`;
   if (result.lineNumber) return `${result.lineNumber}줄`;
   return '-';

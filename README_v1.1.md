@@ -1,6 +1,6 @@
 # Document Manager v1.1
 
-로컬 PC에서 PDF, Markdown, TXT 문서를 업로드, 폴더 등록, 검색, 보기, 분류, 백업/복원할 수 있는 FastAPI + React 기반 문서 관리 도구입니다.
+로컬 PC에서 PDF, Markdown, TXT, PPTX, HWPX 문서를 업로드, 폴더 등록, 검색, 보기, 분류, 백업/복원할 수 있는 FastAPI + React 기반 문서 관리 도구입니다.
 
 현재 `dev1.1` 브랜치는 v1.1 개발 순서 제안의 1단계부터 7단계까지 적용했고, 안정화 가이드 기준 보강 작업까지 포함합니다.
 
@@ -10,18 +10,18 @@
 - Frontend: React + Vite + TypeScript
 - Storage: Local File System
 - Metadata: JSON Index
-- Supported files: PDF, MD, TXT, PPTX
+- Supported files: PDF, MD, TXT, PPTX, HWPX
 - Backend URL: `http://127.0.0.1:8000`
 - Frontend URL: `http://127.0.0.1:5173`
 
 ## v1.1 주요 기능
 
 - 파일 업로드 및 서버 폴더 경로 등록
-- PowerPoint `pptx` 업로드, 텍스트 인덱싱, 검색, 텍스트 미리보기
+- PowerPoint `pptx` 및 한글 `hwpx` 업로드, 텍스트 인덱싱, 검색, 텍스트 미리보기
 - 업로드 진행률 및 폴더 가져오기 작업 상태 표시
 - 문서/폴더 통합 관리
 - 폴더 선택 시 폴더 안의 문서 목록 표시
-- PDF, Markdown, TXT 문서 모달 뷰어
+- PDF, Markdown, TXT, PPTX, HWPX 문서 모달 뷰어
 - 검색어 하이라이트
 - 검색 조건 확장: AND, OR, 문구, 제외어, 태그, 즐겨찾기, 고정
 - 검색 결과 CSV/Markdown 내보내기
@@ -214,6 +214,7 @@ PUT  /api/config
 - 백업 복원 실패 시 `PRE_RESTORE` 안전 백업으로 롤백을 시도합니다.
 - 로그는 조회뿐 아니라 검색, 다운로드, 보관, 삭제를 지원합니다.
 - PowerPoint는 `pptx`만 지원합니다. 구형 `ppt` 바이너리 파일은 검색/미리보기 품질을 보장하기 어려워 지원 대상에서 제외했습니다.
+- 한글 문서는 XML 기반 `hwpx`만 지원합니다. 구형 `hwp` 바이너리 파일은 이번 버전 지원 대상에서 제외했습니다.
 
 ## 검증
 

@@ -422,7 +422,7 @@ def get_preview(document_id: str) -> dict:
             "lines": [],
         }
 
-    if document["extension"] == "pptx":
+    if document["extension"] in {"pptx", "hwpx"}:
         extraction = extract_text(file_path, document["extension"])
         return {
             "document": document,
@@ -431,7 +431,7 @@ def get_preview(document_id: str) -> dict:
             "lines": [
                 {
                     "lineNumber": location.get("lineNumber") or index,
-                    "text": _presentation_preview_text(location),
+                    "text": _structured_preview_text(location),
                 }
                 for index, location in enumerate(extraction["locations"], start=1)
             ],
@@ -455,10 +455,15 @@ def _read_text_file(file_path: Path) -> str:
     return file_path.read_text(encoding="utf-8", errors="replace")
 
 
-def _presentation_preview_text(location: dict) -> str:
-    slide = location.get("pageNumber") or location.get("lineNumber")
+def _structured_preview_text(location: dict) -> str:
     text = location.get("text", "")
-    return f"Slide {slide}: {text}" if slide else text
+    if location.get("locationType") == "SLIDE":
+        slide = location.get("pageNumber") or location.get("lineNumber")
+        return f"Slide {slide}: {text}" if slide else text
+    if location.get("locationType") == "SECTION":
+        section = location.get("pageNumber")
+        return f"Section {section}: {text}" if section else text
+    return text
 
 
 def _find_document(documents: list[dict], document_id: str) -> dict:

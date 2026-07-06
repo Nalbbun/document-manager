@@ -80,7 +80,7 @@ export default function UploadPage() {
       <div className="page-header">
         <div>
           <h1>파일 등록</h1>
-          <p>PDF, MD, TXT 문서 등록</p>
+          <p>PDF, MD, TXT, PPTX, HWPX 문서 등록</p>
         </div>
       </div>
 
@@ -101,7 +101,7 @@ export default function UploadPage() {
           </label>
           <label>
             문서 파일
-            <input type="file" multiple accept=".pdf,.md,.txt,.pptx" disabled={busy} onChange={(event) => setFiles(event.target.files)} />
+            <input type="file" multiple accept=".pdf,.md,.txt,.pptx,.hwpx" disabled={busy} onChange={(event) => setFiles(event.target.files)} />
           </label>
           <button className="icon-text-button primary" disabled={!folderId || !files?.length || busy} title="파일 등록">
             <UploadCloud size={17} />

@@ -10,6 +10,7 @@ class Settings:
     project_root: Path = Path(__file__).resolve().parents[3]
     config_path: Path = project_root / "data" / "config" / "app-config.json"
     legacy_default_extensions: set[str] = {"pdf", "md", "txt"}
+    previous_default_extensions: set[str] = {"pdf", "md", "txt", "pptx"}
 
     default_config: dict[str, Any] = {
         "appName": "document-manager-v1",
@@ -19,7 +20,7 @@ class Settings:
         "trashRootPath": "data/trash",
         "backupRootPath": "data/backup",
         "importRootPath": "data/import",
-        "allowedExtensions": ["pdf", "md", "txt", "pptx"],
+        "allowedExtensions": ["pdf", "md", "txt", "pptx", "hwpx"],
         "maxUploadSizeMB": 100,
         "maxImportFileCount": 1000,
         "maxImportTotalSizeMB": 2048,
@@ -72,7 +73,8 @@ class Settings:
 
         merged = dict(self.default_config)
         merged.update(loaded)
-        if set(self._normalize_extensions(merged.get("allowedExtensions", []))) == self.legacy_default_extensions:
+        current_extensions = set(self._normalize_extensions(merged.get("allowedExtensions", [])))
+        if current_extensions in (self.legacy_default_extensions, self.previous_default_extensions):
             merged["allowedExtensions"] = list(self.default_config["allowedExtensions"])
             self.write_runtime_config(merged)
         return merged

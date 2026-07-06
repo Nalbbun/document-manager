@@ -10,6 +10,7 @@ from app.utils.exceptions import AppError
 INVALID_PATH_CHARS = set('<>:"/\\|?*')
 RESERVED_NAMES = {".", "..", "CON", "PRN", "AUX", "NUL"}
 EXPLICIT_MIME_TYPES = {
+    "hwpx": "application/vnd.hancom.hwpx",
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 }
 

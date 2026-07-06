@@ -14,7 +14,7 @@ export type DocumentItem = {
   folderName: string;
   fileName: string;
   displayName: string;
-  extension: 'pdf' | 'md' | 'txt' | 'pptx' | string;
+  extension: 'pdf' | 'md' | 'txt' | 'pptx' | 'hwpx' | string;
   mimeType: string;
   fileSize: number;
   filePath: string;
@@ -158,7 +158,7 @@ export type SearchResult = {
   fileName: string;
   displayName: string;
   extension: string;
-  locationType: 'PAGE' | 'LINE' | string;
+  locationType: 'PAGE' | 'LINE' | 'SLIDE' | 'SECTION' | string;
   pageNumber: number | null;
   lineNumber: number | null;
   snippet: string;
