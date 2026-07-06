@@ -73,7 +73,10 @@ def update_config(payload: dict) -> dict:
         extensions = [extension.lower().lstrip(".") for extension in updates["allowedExtensions"] if extension]
         if not extensions:
             raise AppError("허용 확장자를 1개 이상 입력하세요.")
-        updates["allowedExtensions"] = sorted(set(extensions))
+        extension_set = set(extensions)
+        if extension_set == settings.legacy_default_extensions:
+            extension_set.update(settings.default_config["allowedExtensions"])
+        updates["allowedExtensions"] = sorted(extension_set)
     if "defaultFolderName" in updates:
         updates["defaultFolderName"] = validate_folder_name(updates["defaultFolderName"])
     if "unclassifiedFolderName" in updates:

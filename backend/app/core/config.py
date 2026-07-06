@@ -74,6 +74,7 @@ class Settings:
         merged.update(loaded)
         if set(self._normalize_extensions(merged.get("allowedExtensions", []))) == self.legacy_default_extensions:
             merged["allowedExtensions"] = list(self.default_config["allowedExtensions"])
+            self.write_runtime_config(merged)
         return merged
 
     def write_runtime_config(self, config: dict[str, Any]) -> None:
