@@ -14,7 +14,7 @@ export type DocumentItem = {
   folderName: string;
   fileName: string;
   displayName: string;
-  extension: 'pdf' | 'md' | 'txt' | string;
+  extension: 'pdf' | 'md' | 'txt' | 'pptx' | string;
   mimeType: string;
   fileSize: number;
   filePath: string;

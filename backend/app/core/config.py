@@ -9,6 +9,7 @@ from typing import Any
 class Settings:
     project_root: Path = Path(__file__).resolve().parents[3]
     config_path: Path = project_root / "data" / "config" / "app-config.json"
+    legacy_default_extensions: set[str] = {"pdf", "md", "txt"}
 
     default_config: dict[str, Any] = {
         "appName": "document-manager-v1",
@@ -18,7 +19,7 @@ class Settings:
         "trashRootPath": "data/trash",
         "backupRootPath": "data/backup",
         "importRootPath": "data/import",
-        "allowedExtensions": ["pdf", "md", "txt"],
+        "allowedExtensions": ["pdf", "md", "txt", "pptx"],
         "maxUploadSizeMB": 100,
         "maxImportFileCount": 1000,
         "maxImportTotalSizeMB": 2048,
@@ -71,6 +72,8 @@ class Settings:
 
         merged = dict(self.default_config)
         merged.update(loaded)
+        if set(self._normalize_extensions(merged.get("allowedExtensions", []))) == self.legacy_default_extensions:
+            merged["allowedExtensions"] = list(self.default_config["allowedExtensions"])
         return merged
 
     def write_runtime_config(self, config: dict[str, Any]) -> None:
@@ -141,7 +144,7 @@ class Settings:
 
     @property
     def allowed_extensions(self) -> set[str]:
-        return {extension.lower().lstrip(".") for extension in self.runtime_config["allowedExtensions"]}
+        return set(self._normalize_extensions(self.runtime_config["allowedExtensions"]))
 
     @property
     def default_folder_name(self) -> str:
@@ -156,6 +159,11 @@ class Settings:
         if path.is_absolute():
             return path.resolve()
         return (self.project_root / path).resolve()
+
+    def _normalize_extensions(self, extensions: Any) -> list[str]:
+        if not isinstance(extensions, list):
+            return []
+        return [str(extension).lower().lstrip(".") for extension in extensions if extension]
 
 
 settings = Settings()

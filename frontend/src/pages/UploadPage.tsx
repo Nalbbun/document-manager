@@ -101,7 +101,7 @@ export default function UploadPage() {
           </label>
           <label>
             문서 파일
-            <input type="file" multiple accept=".pdf,.md,.txt" disabled={busy} onChange={(event) => setFiles(event.target.files)} />
+            <input type="file" multiple accept=".pdf,.md,.txt,.pptx" disabled={busy} onChange={(event) => setFiles(event.target.files)} />
           </label>
           <button className="icon-text-button primary" disabled={!folderId || !files?.length || busy} title="파일 등록">
             <UploadCloud size={17} />

@@ -40,7 +40,8 @@ export default function DashboardPage() {
     return {
       pdf: byExtension.pdf || 0,
       md: byExtension.md || 0,
-      txt: byExtension.txt || 0
+      txt: byExtension.txt || 0,
+      pptx: byExtension.pptx || 0
     };
   }, [documents]);
 
@@ -73,6 +74,7 @@ export default function DashboardPage() {
         <Stat label="PDF" value={counts.pdf} />
         <Stat label="MD" value={counts.md} />
         <Stat label="TXT" value={counts.txt} />
+        <Stat label="PPTX" value={counts.pptx} />
         <Stat label="인덱스 항목" value={status?.searchIndexItemCount ?? 0} />
       </div>
 

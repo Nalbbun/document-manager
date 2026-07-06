@@ -10,13 +10,14 @@
 - Frontend: React + Vite + TypeScript
 - Storage: Local File System
 - Metadata: JSON Index
-- Supported files: PDF, MD, TXT
+- Supported files: PDF, MD, TXT, PPTX
 - Backend URL: `http://127.0.0.1:8000`
 - Frontend URL: `http://127.0.0.1:5173`
 
 ## v1.1 주요 기능
 
 - 파일 업로드 및 서버 폴더 경로 등록
+- PowerPoint `pptx` 업로드, 텍스트 인덱싱, 검색, 텍스트 미리보기
 - 업로드 진행률 및 폴더 가져오기 작업 상태 표시
 - 문서/폴더 통합 관리
 - 폴더 선택 시 폴더 안의 문서 목록 표시
@@ -212,6 +213,7 @@ PUT  /api/config
 - 백업 복원 전 preview와 dry-run으로 복원 가능 여부를 확인할 수 있습니다.
 - 백업 복원 실패 시 `PRE_RESTORE` 안전 백업으로 롤백을 시도합니다.
 - 로그는 조회뿐 아니라 검색, 다운로드, 보관, 삭제를 지원합니다.
+- PowerPoint는 `pptx`만 지원합니다. 구형 `ppt` 바이너리 파일은 검색/미리보기 품질을 보장하기 어려워 지원 대상에서 제외했습니다.
 
 ## 검증
 

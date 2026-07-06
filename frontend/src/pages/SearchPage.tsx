@@ -241,6 +241,7 @@ export default function SearchPage() {
           <option value="pdf">PDF</option>
           <option value="md">MD</option>
           <option value="txt">TXT</option>
+          <option value="pptx">PPTX</option>
         </select>
         <select value={tag} onChange={(event) => setTag(event.target.value)}>
           <option value="">전체 태그</option>

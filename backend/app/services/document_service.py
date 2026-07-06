@@ -81,12 +81,7 @@ def move_document(document_id: str, folder_id: str) -> dict:
 
     target_folder_path = ensure_within_root(settings.project_root / target_folder["folderPath"], settings.storage_root)
     target_folder_path.mkdir(parents=True, exist_ok=True)
-    file_name = document["fileName"]
-    target_path = ensure_within_root(target_folder_path / file_name, settings.storage_root)
-    has_conflict = _duplicate_file_exists(documents, target_folder["folderId"], file_name) or target_path.exists()
-    if has_conflict and policy == "auto_rename":
-        file_name = _available_restore_file_name(file_name, target_folder_path, documents, target_folder["folderId"])
-        target_path = ensure_within_root(target_folder_path / file_name, settings.storage_root)
+    target_path = ensure_within_root(target_folder_path / document["fileName"], settings.storage_root)
 
     if _duplicate_file_exists(documents, folder_id, document["fileName"], exclude_document_id=document_id) or target_path.exists():
         raise AppError("이동 대상 폴더에 같은 파일명이 이미 있습니다.")
@@ -339,7 +334,12 @@ def restore_trash_item(trash_id: str, folder_id: str | None = None, conflict_pol
 
     target_folder_path = ensure_within_root(settings.project_root / target_folder["folderPath"], settings.storage_root)
     target_folder_path.mkdir(parents=True, exist_ok=True)
-    target_path = ensure_within_root(target_folder_path / document["fileName"], settings.storage_root)
+    file_name = document["fileName"]
+    target_path = ensure_within_root(target_folder_path / file_name, settings.storage_root)
+    has_conflict = _duplicate_file_exists(documents, target_folder["folderId"], file_name) or target_path.exists()
+    if has_conflict and policy == "auto_rename":
+        file_name = _available_restore_file_name(file_name, target_folder_path, documents, target_folder["folderId"])
+        target_path = ensure_within_root(target_folder_path / file_name, settings.storage_root)
     if target_path.exists():
         raise AppError("복원 대상 경로에 같은 파일이 이미 있습니다.")
 
@@ -422,6 +422,21 @@ def get_preview(document_id: str) -> dict:
             "lines": [],
         }
 
+    if document["extension"] == "pptx":
+        extraction = extract_text(file_path, document["extension"])
+        return {
+            "document": document,
+            "viewerType": "text",
+            "fileUrl": f"/api/documents/{document_id}/file",
+            "lines": [
+                {
+                    "lineNumber": location.get("lineNumber") or index,
+                    "text": _presentation_preview_text(location),
+                }
+                for index, location in enumerate(extraction["locations"], start=1)
+            ],
+        }
+
     text = _read_text_file(file_path)
     return {
         "document": document,
@@ -438,6 +453,12 @@ def _read_text_file(file_path: Path) -> str:
         except UnicodeDecodeError:
             continue
     return file_path.read_text(encoding="utf-8", errors="replace")
+
+
+def _presentation_preview_text(location: dict) -> str:
+    slide = location.get("pageNumber") or location.get("lineNumber")
+    text = location.get("text", "")
+    return f"Slide {slide}: {text}" if slide else text
 
 
 def _find_document(documents: list[dict], document_id: str) -> dict:

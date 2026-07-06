@@ -28,3 +28,23 @@
 
 - Backend compile: `python -m compileall backend\app`
 - Frontend build: `pnpm run build`
+
+## v1.1 PPTX Support
+
+### Added
+
+- PPTX upload support.
+- PPTX slide text extraction for indexing and search.
+- PPTX text preview through the existing document viewer.
+- PPTX extension filters in document and search screens.
+- PPTX dashboard statistics.
+
+### Notes
+
+- Legacy PPT files are intentionally not supported.
+- Users should convert PPT files to PPTX before upload.
+
+### Verified
+
+- Backend compile: `python -m compileall backend\app`
+- Frontend build: `pnpm run build`

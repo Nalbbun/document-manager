@@ -550,6 +550,7 @@ export default function DocumentPage() {
               <option value="pdf">PDF</option>
               <option value="md">MD</option>
               <option value="txt">TXT</option>
+              <option value="pptx">PPTX</option>
             </select>
             <select value={tagFilter} onChange={(event) => setTagFilter(event.target.value)}>
               <option value="">전체 태그</option>
@@ -629,7 +630,7 @@ export default function DocumentPage() {
                 >
                   전체
                 </button>
-                {['pdf', 'md', 'txt'].map((item) => (
+                {['pdf', 'md', 'txt', 'pptx'].map((item) => (
                   <button
                     type="button"
                     className={extension === item ? 'active' : ''}

@@ -9,6 +9,9 @@ from app.utils.exceptions import AppError
 
 INVALID_PATH_CHARS = set('<>:"/\\|?*')
 RESERVED_NAMES = {".", "..", "CON", "PRN", "AUX", "NUL"}
+EXPLICIT_MIME_TYPES = {
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
 
 
 def normalize_extension(file_name: str) -> str:
@@ -56,6 +59,8 @@ def relative_to_project(path: Path, project_root: Path) -> str:
 
 
 def guess_mime_type(file_name: str) -> str:
+    extension = normalize_extension(file_name)
+    if extension in EXPLICIT_MIME_TYPES:
+        return EXPLICIT_MIME_TYPES[extension]
     mime_type, _ = mimetypes.guess_type(file_name)
     return mime_type or "application/octet-stream"
-
