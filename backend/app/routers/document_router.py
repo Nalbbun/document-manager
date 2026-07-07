@@ -100,8 +100,12 @@ def get_document_file(document_id: str) -> FileResponse:
 
 
 @router.get("/{document_id}/preview")
-def get_document_preview(document_id: str) -> dict:
-    return document_service.get_preview(document_id)
+def get_document_preview(
+    document_id: str,
+    line: int | None = Query(None, ge=1),
+    limit: int = Query(250, ge=1, le=500),
+) -> dict:
+    return document_service.get_preview(document_id, line=line, limit=limit)
 
 
 @router.get("/{document_id}")

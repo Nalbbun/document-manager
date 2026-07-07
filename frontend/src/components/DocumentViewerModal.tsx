@@ -12,24 +12,36 @@ export type ViewerTarget = {
   line?: number | null;
 };
 
+const TEXT_PREVIEW_LIMIT = 250;
+
 export function DocumentViewerModal({ target, onClose }: { target: ViewerTarget | null; onClose: () => void }) {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [error, setError] = useState('');
+  const [focusLine, setFocusLine] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!target) {
+      setFocusLine(null);
+      return;
+    }
+    setFocusLine(target.line || null);
+  }, [target?.documentId, target?.line]);
 
   useEffect(() => {
     if (!target) return;
     setPreview(null);
     setError('');
     api
-      .preview(target.documentId)
+      .preview(target.documentId, { line: focusLine || target.line || undefined, limit: TEXT_PREVIEW_LIMIT })
       .then(setPreview)
       .catch((err) => setError(err instanceof Error ? err.message : '문서 미리보기 실패'));
-  }, [target]);
+  }, [target?.documentId, target?.line, focusLine]);
 
   useEffect(() => {
-    if (!target?.line || !preview) return;
-    document.getElementById(`modal-line-${target.line}`)?.scrollIntoView({ block: 'center' });
-  }, [target?.line, preview]);
+    const activeLine = focusLine || target?.line;
+    if (!activeLine || !preview) return;
+    document.getElementById(`modal-line-${activeLine}`)?.scrollIntoView({ block: 'center' });
+  }, [focusLine, target?.line, preview]);
 
   useEffect(() => {
     if (!target) return;
@@ -48,6 +60,11 @@ export function DocumentViewerModal({ target, onClose }: { target: ViewerTarget 
   }, [preview, target]);
 
   if (!target) return null;
+
+  const activeLine = focusLine || target.line || null;
+  const previewInfo = preview?.previewInfo;
+  const canMoveBackward = Boolean(previewInfo?.limited && previewInfo.startLine && previewInfo.startLine > 1);
+  const canMoveForward = Boolean(previewInfo?.limited && previewInfo.endLine && previewInfo.endLine < previewInfo.totalLines);
 
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
@@ -79,11 +96,35 @@ export function DocumentViewerModal({ target, onClose }: { target: ViewerTarget 
           {preview?.viewerType === 'pdf' && <iframe className="modal-pdf-frame" src={pdfUrl} title={preview.document.displayName} />}
           {preview?.viewerType === 'text' && (
             <section className="text-viewer modal-text-viewer">
+              {previewInfo?.limited && (
+                <div className="preview-range-banner">
+                  <span>
+                    전체 {previewInfo.totalLines.toLocaleString()}줄 중 {previewInfo.startLine?.toLocaleString()}-
+                    {previewInfo.endLine?.toLocaleString()}줄 표시
+                  </span>
+                  <div>
+                    <button
+                      className="icon-text-button"
+                      disabled={!canMoveBackward}
+                      onClick={() => setFocusLine(Math.max(1, (previewInfo.startLine || 1) - TEXT_PREVIEW_LIMIT))}
+                    >
+                      이전
+                    </button>
+                    <button
+                      className="icon-text-button"
+                      disabled={!canMoveForward}
+                      onClick={() => setFocusLine((previewInfo.endLine || 0) + 1)}
+                    >
+                      다음
+                    </button>
+                  </div>
+                </div>
+              )}
               {preview.lines.map((item) => (
                 <div
                   id={`modal-line-${item.lineNumber}`}
                   key={item.lineNumber}
-                  className={target.line === item.lineNumber ? 'text-line active-line' : 'text-line'}
+                  className={activeLine === item.lineNumber ? 'text-line active-line' : 'text-line'}
                 >
                   <span>{item.lineNumber}</span>
                   <p>

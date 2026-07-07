@@ -225,4 +225,11 @@ export type PreviewResponse = {
   viewerType: 'pdf' | 'text';
   fileUrl: string;
   lines: Array<{ lineNumber: number; text: string }>;
+  previewInfo: {
+    totalLines: number;
+    startLine: number | null;
+    endLine: number | null;
+    limit: number;
+    limited: boolean;
+  };
 };

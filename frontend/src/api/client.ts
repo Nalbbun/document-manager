@@ -68,7 +68,8 @@ export const api = {
   documents: (params: Record<string, string | number | boolean | undefined> = {}) =>
     request<{ documents: DocumentItem[] }>(`/api/documents${query(params)}`),
   document: (documentId: string) => request<{ document: DocumentItem }>(`/api/documents/${documentId}`),
-  preview: (documentId: string) => request<PreviewResponse>(`/api/documents/${documentId}/preview`),
+  preview: (documentId: string, params: { line?: number | null; limit?: number } = {}) =>
+    request<PreviewResponse>(`/api/documents/${documentId}/preview${query(params)}`),
   deleteDocument: (documentId: string) => request(`/api/documents/${documentId}`, { method: 'DELETE' }),
   documentTags: () => request<{ items: TagSummary[] }>('/api/documents/tags'),
   duplicateDocuments: () => request<{ items: DuplicateGroup[] }>('/api/documents/duplicates'),

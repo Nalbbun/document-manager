@@ -17,6 +17,10 @@ from app.utils.exceptions import AppError
 from app.utils.file_utils import ensure_within_root, relative_to_project, safe_file_name
 
 
+TEXT_PREVIEW_DEFAULT_LIMIT = 250
+TEXT_PREVIEW_MAX_LIMIT = 500
+
+
 def list_documents(
     folder_id: str | None = None,
     extension: str | None = None,
@@ -408,11 +412,13 @@ def get_file_response(document_id: str) -> FileResponse:
     )
 
 
-def get_preview(document_id: str) -> dict:
+def get_preview(document_id: str, line: int | None = None, limit: int = TEXT_PREVIEW_DEFAULT_LIMIT) -> dict:
     document = get_document(document_id)
     file_path = _document_file_path(document)
     if not file_path.exists():
         raise AppError("원본 파일을 찾을 수 없습니다.", status_code=404)
+
+    preview_limit = _normalize_preview_limit(limit)
 
     if document["extension"] == "pdf":
         return {
@@ -420,10 +426,14 @@ def get_preview(document_id: str) -> dict:
             "viewerType": "pdf",
             "fileUrl": f"/api/documents/{document_id}/file",
             "lines": [],
+            "previewInfo": _preview_info([], 0, preview_limit),
         }
 
     if document["extension"] in {"pptx", "hwpx"}:
-        extraction = extract_text(file_path, document["extension"])
+        locations = _indexed_locations(document_id)
+        if not locations:
+            locations = extract_text(file_path, document["extension"])["locations"]
+        selected = _slice_locations_for_preview(locations, line, preview_limit)
         return {
             "document": document,
             "viewerType": "text",
@@ -433,16 +443,20 @@ def get_preview(document_id: str) -> dict:
                     "lineNumber": location.get("lineNumber") or index,
                     "text": _structured_preview_text(location),
                 }
-                for index, location in enumerate(extraction["locations"], start=1)
+                for index, location in enumerate(selected, start=1)
             ],
+            "previewInfo": _preview_info_from_locations(selected, len(locations), preview_limit),
         }
 
     text = _read_text_file(file_path)
+    text_lines = [{"lineNumber": index, "text": line_text} for index, line_text in enumerate(text.splitlines(), start=1)]
+    selected_lines = _slice_lines_for_preview(text_lines, line, preview_limit)
     return {
         "document": document,
         "viewerType": "text",
         "fileUrl": f"/api/documents/{document_id}/file",
-        "lines": [{"lineNumber": index, "text": line} for index, line in enumerate(text.splitlines(), start=1)],
+        "lines": selected_lines,
+        "previewInfo": _preview_info(selected_lines, len(text_lines), preview_limit),
     }
 
 
@@ -464,6 +478,79 @@ def _structured_preview_text(location: dict) -> str:
         section = location.get("pageNumber")
         return f"Section {section}: {text}" if section else text
     return text
+
+
+def _indexed_locations(document_id: str) -> list[dict]:
+    matches = [item for item in read_items() if item.get("documentId") == document_id]
+    if not matches:
+        return []
+    item = max(matches, key=lambda current: len(current.get("locations", [])))
+    return item.get("locations", [])
+
+
+def _slice_locations_for_preview(locations: list[dict], focus_line: int | None, limit: int) -> list[dict]:
+    if not locations:
+        return []
+    line_numbers = [_location_line_number(location, index) for index, location in enumerate(locations, start=1)]
+    start = _preview_start_index(line_numbers, focus_line, limit)
+    return locations[start : start + limit]
+
+
+def _slice_lines_for_preview(lines: list[dict], focus_line: int | None, limit: int) -> list[dict]:
+    if not lines:
+        return []
+    line_numbers = [int(item["lineNumber"]) for item in lines]
+    start = _preview_start_index(line_numbers, focus_line, limit)
+    return lines[start : start + limit]
+
+
+def _preview_start_index(line_numbers: list[int], focus_line: int | None, limit: int) -> int:
+    total = len(line_numbers)
+    if total <= limit:
+        return 0
+    if not focus_line:
+        return 0
+
+    target_index = next((index for index, line_number in enumerate(line_numbers) if line_number >= focus_line), total - 1)
+    start = max(0, target_index - limit // 3)
+    return min(start, max(0, total - limit))
+
+
+def _location_line_number(location: dict, fallback: int) -> int:
+    value = location.get("lineNumber") or fallback
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _normalize_preview_limit(limit: int) -> int:
+    try:
+        value = int(limit)
+    except (TypeError, ValueError):
+        value = TEXT_PREVIEW_DEFAULT_LIMIT
+    return max(1, min(value, TEXT_PREVIEW_MAX_LIMIT))
+
+
+def _preview_info_from_locations(locations: list[dict], total: int, limit: int) -> dict:
+    lines = [
+        {
+            "lineNumber": _location_line_number(location, index),
+            "text": location.get("text", ""),
+        }
+        for index, location in enumerate(locations, start=1)
+    ]
+    return _preview_info(lines, total, limit)
+
+
+def _preview_info(lines: list[dict], total: int, limit: int) -> dict:
+    return {
+        "totalLines": total,
+        "startLine": lines[0]["lineNumber"] if lines else None,
+        "endLine": lines[-1]["lineNumber"] if lines else None,
+        "limit": limit,
+        "limited": total > len(lines),
+    }
 
 
 def _find_document(documents: list[dict], document_id: str) -> dict:

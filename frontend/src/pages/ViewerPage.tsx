@@ -6,6 +6,8 @@ import { HighlightedText } from '../components/HighlightedText';
 import { StatusPill } from '../components/StatusPill';
 import type { PreviewResponse } from '../types/models';
 
+const TEXT_PREVIEW_LIMIT = 250;
+
 export default function ViewerPage() {
   const { documentId = '' } = useParams();
   const [searchParams] = useSearchParams();
@@ -15,30 +17,41 @@ export default function ViewerPage() {
   const keyword = searchParams.get('keyword') || '';
   const page = Number(searchParams.get('page') || '1');
   const line = Number(searchParams.get('line') || '0');
+  const [focusLine, setFocusLine] = useState<number | null>(null);
 
   const load = async () => {
     try {
       setError('');
-      setPreview(await api.preview(documentId));
+      setPreview(await api.preview(documentId, { line: focusLine || line || undefined, limit: TEXT_PREVIEW_LIMIT }));
     } catch (err) {
       setError(err instanceof Error ? err.message : '문서 미리보기 실패');
     }
   };
 
   useEffect(() => {
-    void load();
-  }, [documentId]);
+    setFocusLine(line || null);
+  }, [documentId, line]);
 
   useEffect(() => {
-    if (!line || !preview) return;
-    document.getElementById(`line-${line}`)?.scrollIntoView({ block: 'center' });
-  }, [line, preview]);
+    void load();
+  }, [documentId, focusLine]);
+
+  useEffect(() => {
+    const activeLine = focusLine || line;
+    if (!activeLine || !preview) return;
+    document.getElementById(`line-${activeLine}`)?.scrollIntoView({ block: 'center' });
+  }, [focusLine, line, preview]);
 
   const pdfUrl = useMemo(() => {
     if (!preview) return '';
     const searchFragment = keyword ? `&search=${encodeURIComponent(keyword)}` : '';
     return `${API_BASE_URL}${preview.fileUrl}#page=${page || 1}${searchFragment}`;
   }, [preview, page, keyword]);
+
+  const activeLine = focusLine || line || null;
+  const previewInfo = preview?.previewInfo;
+  const canMoveBackward = Boolean(previewInfo?.limited && previewInfo.startLine && previewInfo.startLine > 1);
+  const canMoveForward = Boolean(previewInfo?.limited && previewInfo.endLine && previewInfo.endLine < previewInfo.totalLines);
 
   return (
     <section className="page viewer-page">
@@ -70,11 +83,35 @@ export default function ViewerPage() {
 
       {preview?.viewerType === 'text' && (
         <section className="text-viewer">
+          {previewInfo?.limited && (
+            <div className="preview-range-banner">
+              <span>
+                전체 {previewInfo.totalLines.toLocaleString()}줄 중 {previewInfo.startLine?.toLocaleString()}-
+                {previewInfo.endLine?.toLocaleString()}줄 표시
+              </span>
+              <div>
+                <button
+                  className="icon-text-button"
+                  disabled={!canMoveBackward}
+                  onClick={() => setFocusLine(Math.max(1, (previewInfo.startLine || 1) - TEXT_PREVIEW_LIMIT))}
+                >
+                  이전
+                </button>
+                <button
+                  className="icon-text-button"
+                  disabled={!canMoveForward}
+                  onClick={() => setFocusLine((previewInfo.endLine || 0) + 1)}
+                >
+                  다음
+                </button>
+              </div>
+            </div>
+          )}
           {preview.lines.map((item) => (
             <div
               id={`line-${item.lineNumber}`}
               key={item.lineNumber}
-              className={line === item.lineNumber ? 'text-line active-line' : 'text-line'}
+              className={activeLine === item.lineNumber ? 'text-line active-line' : 'text-line'}
             >
               <span>{item.lineNumber}</span>
               <p>
